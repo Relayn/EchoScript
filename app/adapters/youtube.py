@@ -1,9 +1,12 @@
+# app/adapters/youtube.py
 """
 Этот адаптер отвечает за обработку URL-адресов YouTube, загрузку
 аудиопотока и предоставление пути к аудиофайлу, используя yt-dlp.
 """
 import os
+import shutil
 import tempfile
+
 import yt_dlp
 from rich.console import Console
 
@@ -15,12 +18,24 @@ class YoutubeAdapterError(Exception):
     pass
 
 
+class FFmpegNotFoundError(YoutubeAdapterError):
+    """Исключение, вызываемое, когда ffmpeg не найден в системе."""
+    pass
+
+
 class YoutubeAdapter:
     """Обрабатывает загрузку аудио с URL-адресов YouTube с помощью yt-dlp."""
 
     def __init__(self):
         self._temp_dir = tempfile.mkdtemp(prefix="echoscript_")
         self._downloaded_file_path = None
+        # Проверяем наличие ffmpeg при инициализации
+        if not shutil.which("ffmpeg"):
+            raise FFmpegNotFoundError(
+                "Для работы с YouTube необходим ffmpeg, но он не найден в вашей системе.\n"
+                "Пожалуйста, установите его и убедитесь, что он доступен в системном PATH.\n"
+                "Инструкции по установке: https://ffmpeg.org/download.html"
+            )
 
     def download_audio(self, url: str) -> str | None:
         """
@@ -34,47 +49,49 @@ class YoutubeAdapter:
         """
         console.print(f"▶️ [bold blue]Загрузка аудио с YouTube (используя yt-dlp):[/bold blue] {url}")
 
-        # Имя файла будет содержать ID видео, чтобы избежать конфликтов
-        # Мы не можем знать точное расширение, поэтому используем шаблон
         output_template = os.path.join(self._temp_dir, "%(id)s.%(ext)s")
 
         ydl_opts = {
-            'format': 'm4a/bestaudio/best',
+            'format': 'bestaudio/best',
             'outtmpl': output_template,
-            'quiet': True, # Подавляем вывод самого yt-dlp
+            'quiet': True,
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'm4a',
-            }]
+                'preferredcodec': 'm4a', # m4a - хороший компромисс между качеством и размером
+            }],
+            'noprogress': True,
         }
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 console.print(f"   - Название: [italic]{info.get('title', 'N/A')}[/italic]")
+                console.print(f"   - Длительность: [italic]{info.get('duration_string', 'N/A')}[/italic]")
 
-                # Запускаем загрузку
                 ydl.download([url])
 
-                # yt-dlp сам определяет имя файла, нам нужно его найти
                 downloaded_files = os.listdir(self._temp_dir)
                 if not downloaded_files:
                     raise YoutubeAdapterError("yt-dlp завершил работу, но файл не был создан.")
 
                 self._downloaded_file_path = os.path.join(self._temp_dir, downloaded_files[0])
-                console.print(f"   - [green]Аудио успешно загружено в:[/green] {self._downloaded_file_path}")
+                console.print(f"   - [green]Аудио успешно извлечено в:[/green] {self._downloaded_file_path}")
                 return self._downloaded_file_path
 
-        except Exception as e:
+        except yt_dlp.utils.DownloadError as e:
             console.print(f"[bold red]❌ Ошибка при загрузке с YouTube (yt-dlp):[/bold red] {e}")
-            self.cleanup() # Очищаем, если что-то пошло не так
+            self.cleanup()
             return None
+        except Exception as e:
+            console.print(f"[bold red]❌ Непредвиденная ошибка в YoutubeAdapter:[/bold red] {e}")
+            self.cleanup()
+            return None
+
 
     def cleanup(self):
         """Удаляет временную директорию и все ее содержимое."""
         if os.path.exists(self._temp_dir):
             try:
-                import shutil
                 shutil.rmtree(self._temp_dir)
                 console.print(f"   - [dim]Временные файлы очищены ({self._temp_dir}).[/dim]")
             except Exception as e:
