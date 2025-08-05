@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "echoscript"
+version = "0.1.0"
+description = "Utility for transcribing audio/video files and YouTube links using Whisper."
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = "~3.11"
+typer = {extras = ["rich"], version = "^0.16.0"}
+pydantic = "^2.11.7"
+numpy = "<2.0"
+soundfile = "^0.13.1"
+torch = {version = ">=2.3.1", source = "pytorch_cuda"}
+torchvision = {version = ">=0.18.1", source = "pytorch_cuda"}
+torchaudio = {version = ">=2.3.1", source = "pytorch_cuda"}
+openai-whisper = "^20250625"
+yt-dlp = "^2025.7.21"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+ruff = "^0.12.7"
+black = "^25.1.0"
+
+[tool.poetry.scripts]
+echoscript = "app.main:app"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+# --- Tool Configuration ---
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 88
+select = ["E", "W", "F", "I", "C90", "B"]
+ignore = ["B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[[tool.poetry.source]]
+name = "pytorch_cuda"
+url = "https://download.pytorch.org/whl/cu121"
+priority = "explicit"
