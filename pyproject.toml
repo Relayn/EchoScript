@@ -12,9 +12,9 @@ typer = {extras = ["rich"], version = "^0.16.0"}
 pydantic = "^2.11.7"
 numpy = "<2.0"
 soundfile = "^0.13.1"
-torch = {version = ">=2.3.1", source = "pytorch_cuda"}
-torchvision = {version = ">=0.18.1", source = "pytorch_cuda"}
-torchaudio = {version = ">=2.3.1", source = "pytorch_cuda"}
+torch = ">=2.3.1"
+torchvision = ">=0.18.1"
+torchaudio = ">=2.3.1"
 openai-whisper = "^20250625"
 yt-dlp = "^2025.7.21"
 
@@ -22,6 +22,10 @@ yt-dlp = "^2025.7.21"
 pytest = "^8.4.1"
 ruff = "^0.12.7"
 black = "^25.1.0"
+pyinstaller = "^6.15.0"
+
+[tool.poetry.group.gui.dependencies]
+customtkinter = "^5.2.2"
 
 [tool.poetry.scripts]
 echoscript = "app.main:app"

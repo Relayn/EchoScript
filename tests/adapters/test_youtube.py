@@ -49,33 +49,37 @@ def test_download_audio_handles_yt_dlp_error(mock_which):
 @patch("shutil.which", return_value="/fake/path/to/ffmpeg")
 def test_download_audio_success_path(mock_which):
     """
-    Проверяет успешный сценарий: ffmpeg найден, видео загружено.
+    Проверяет успешный сценарий: ffmpeg найден, видео загружено и сконвертировано.
     """
     # Arrange
     adapter = YoutubeAdapter()
-    # Нам нужно знать путь к временной директории, которую создает адаптер
     temp_dir = adapter._temp_dir
-    expected_file_path = Path(temp_dir) / "test_video_id.m4a"
+    # Путь к файлу, который "скачает" yt-dlp
+    source_m4a_path = Path(temp_dir) / "test_video_id.m4a"
+    # Путь к файлу, который должен получиться после конвертации
+    expected_wav_path = source_m4a_path.with_suffix(".wav")
 
-    # Мокируем yt_dlp.YoutubeDL для имитации успешной загрузки
-    with patch("yt_dlp.YoutubeDL") as mock_yt_dlp:
-        mock_instance = mock_yt_dlp.return_value.__enter__.return_value
-        mock_instance.extract_info.return_value = {
-            "title": "Test Video",
-            "duration_string": "01:23",
+    # Мокируем yt_dlp и subprocess
+    with patch("yt_dlp.YoutubeDL") as mock_yt_dlp, \
+         patch("subprocess.run") as mock_subprocess:
+
+        mock_yt_instance = mock_yt_dlp.return_value.__enter__.return_value
+        mock_yt_instance.extract_info.return_value = {
+            "title": "Test Video", "duration_string": "01:23",
         }
 
-        # Имитируем, что yt-dlp создал файл
+        # Имитируем, что yt-dlp создал .m4a файл
         def fake_download(*args, **kwargs):
-            expected_file_path.touch()
-
-        mock_instance.download.side_effect = fake_download
+            source_m4a_path.touch()
+        mock_yt_instance.download.side_effect = fake_download
 
         # Act
         result = adapter.download_audio("https://www.youtube.com/watch?v=test_video_id")
 
         # Assert
-        assert result == str(expected_file_path)
-        assert Path(result).exists()
+        # Проверяем, что subprocess.run был вызван для конвертации
+        mock_subprocess.assert_called_once()
+        # Проверяем, что функция вернула правильный путь к .wav файлу
+        assert result == str(expected_wav_path)
 
     adapter.cleanup()

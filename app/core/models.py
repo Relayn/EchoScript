@@ -1,4 +1,4 @@
-"""Core data models and enumerations for the application."""
+"""Ключевые модели данных и перечисления для приложения."""
 
 import enum
 from typing import Optional, Union
@@ -7,7 +7,7 @@ from pydantic import BaseModel, FilePath, HttpUrl
 
 
 class ModelSize(str, enum.Enum):
-    """Enumeration for the available Whisper model sizes."""
+    """Перечисление доступных размеров моделей Whisper."""
     TINY = "tiny"
     BASE = "base"
     SMALL = "small"
@@ -16,22 +16,22 @@ class ModelSize(str, enum.Enum):
 
 
 class OutputFormat(str, enum.Enum):
-    """Enumeration for the supported output file formats."""
+    """Перечисление поддерживаемых форматов итоговых файлов."""
     TXT = "txt"
     MD = "md"
 
 
-# A type hint representing a valid source: either a local file path or a YouTube URL
+# Типовая подсказка, представляющая валидный источник: локальный путь к файлу или URL YouTube
 Source = Union[FilePath, HttpUrl]
 
 class SourceType(str, enum.Enum):
-    """Enumeration for the source type."""
+    """Перечисление для типов источников данных."""
     FILE = "file"
     YOUTUBE = "youtube"
 
 
 class JobStatus(str, enum.Enum):
-    """Enumeration for the transcription job status."""
+    """Перечисление для статусов задачи транскрибации."""
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -39,7 +39,7 @@ class JobStatus(str, enum.Enum):
 
 
 class TranscriptionJob(BaseModel):
-    """Data model representing a single transcription job."""
+    """Модель данных, представляющая одну задачу на транскрибацию."""
     source: str
     source_type: SourceType
     status: JobStatus = JobStatus.PENDING

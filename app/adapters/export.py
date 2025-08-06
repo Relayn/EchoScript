@@ -31,13 +31,14 @@ class ExportAdapter(abc.ABC):
 class TxtExportAdapter(ExportAdapter):
     """Сохраняет транскрипцию в простой текстовый файл (.txt)."""
 
-    def export(self, text: str, destination_path: pathlib.Path):
+    def export(self, text: str, destination_path: pathlib.Path, silent: bool = True):
         """Сохраняет текст в файл с расширением .txt."""
         try:
             destination_path.write_text(text, encoding="utf-8")
-            console.print(
-                f"💾 [green]Результат сохранен в:[/green] [bold cyan]{destination_path}[/bold cyan]"
-            )
+            if not silent:
+                console.print(
+                    f"💾 [green]Результат сохранен в:[/green] [bold cyan]{destination_path}[/bold cyan]"
+                )
         except IOError as e:
             console.print(f"[bold red]❌ Ошибка при сохранении файла: {e}[/bold red]")
 
@@ -45,15 +46,14 @@ class TxtExportAdapter(ExportAdapter):
 class MdExportAdapter(ExportAdapter):
     """Сохраняет транскрипцию в файл Markdown (.md)."""
 
-    def export(self, text: str, destination_path: pathlib.Path):
+    def export(self, text: str, destination_path: pathlib.Path, silent: bool = True):
         """Сохраняет текст в файл с расширением .md."""
-        # На данный момент логика идентична TXT, но структура готова
-        # для будущих улучшений (например, добавление заголовков).
         try:
             destination_path.write_text(text, encoding="utf-8")
-            console.print(
-                f"💾 [green]Результат сохранен в:[/green] [bold cyan]{destination_path}[/bold cyan]"
-            )
+            if not silent:
+                console.print(
+                    f"💾 [green]Результат сохранен в:[/green] [bold cyan]{destination_path}[/bold cyan]"
+                )
         except IOError as e:
             console.print(f"[bold red]❌ Ошибка при сохранении файла: {e}[/bold red]")
 

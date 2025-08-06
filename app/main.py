@@ -98,9 +98,38 @@ def transcribe(
     from app.services.transcription import TranscriptionService
     from app.adapters.youtube import YoutubeAdapter, FFmpegNotFoundError
     from app.adapters.export import get_exporter
+    from rich.progress import (
+        BarColumn,
+        DownloadColumn,
+        MofNCompleteColumn,
+        Progress,
+        TextColumn,
+        TimeRemainingColumn,
+        TransferSpeedColumn,
+    )
+
+    download_progress = Progress(
+        TextColumn("[bold blue]Загрузка модели...[/]"),
+        BarColumn(bar_width=None),
+        "[progress.percentage]{task.percentage:>3.1f}%", "•",
+        DownloadColumn(), "•",
+        TransferSpeedColumn(), "•",
+        TimeRemainingColumn(),
+        transient=True,
+    )
+
+    def download_callback(downloaded, total):
+        if not download_progress.tasks:
+            download_progress.add_task("download", total=total)
+        download_progress.update(download_progress.tasks[0].id, completed=downloaded)
 
     try:
-        whisper_model = get_model(model)
+        with download_progress:
+            whisper_model = get_model(
+                model_size=model,
+                progress_callback=download_callback,
+                log_callback=console.print,
+            )
     except Exception:
         raise typer.Exit(code=1)
 
@@ -120,9 +149,27 @@ def transcribe(
                 raise typer.Exit(code=1)
 
         service = TranscriptionService(model=whisper_model)
-        transcribed_text = service.transcribe(
-            source_path=audio_path, language=language, timestamps=timestamps
+
+        transcription_progress = Progress(
+            TextColumn("[cyan]Транскрибация...[/]"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeRemainingColumn(),
+            transient=True,
         )
+
+        def transcription_callback(processed, total):
+            if not transcription_progress.tasks:
+                transcription_progress.add_task("transcribe", total=total)
+            transcription_progress.update(transcription_progress.tasks[0].id, completed=processed)
+
+        with transcription_progress:
+            transcribed_text = service.transcribe(
+                source_path=audio_path,
+                language=language,
+                timestamps=timestamps,
+                progress_callback=transcription_callback,
+            )
 
         console.print("\n[bold green]✅ Транскрибация завершена.[/bold green]")
 
@@ -133,7 +180,7 @@ def transcribe(
             destination_path = output_dir / output_filename
 
             exporter = get_exporter(output_format)
-            exporter.export(text=transcribed_text, destination_path=destination_path)
+            exporter.export(text=transcribed_text, destination_path=destination_path, silent=False)
         else:
             console.print(f"📄 Результат:\n[italic]{transcribed_text}[/italic]")
 
