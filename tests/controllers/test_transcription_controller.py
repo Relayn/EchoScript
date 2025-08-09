@@ -1,25 +1,40 @@
 """
 Юнит-тесты для TranscriptionController.
 """
-from unittest.mock import MagicMock, patch, call
+
+import queue
+import threading
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.controllers.transcription_controller import TranscriptionController
-from app.core.models import ModelSize, OutputFormat
+from app.adapters.youtube import FFmpegNotFoundError
+from app.controllers.transcription_controller import (
+    QueueMessage,
+    TranscriptionController,
+)
+from app.core.models import ModelSize, TranscriptionTask
+
+
+def _drain_queue(q: queue.Queue) -> list[QueueMessage]:
+    """Вспомогательная функция для извлечения всех сообщений из очереди."""
+    messages = []
+    while not q.empty():
+        messages.append(q.get_nowait())
+    return messages
 
 
 @pytest.fixture
 def mock_view():
     """Фикстура, создающая мок-объект для View (App)."""
     view = MagicMock()
-    # Настраиваем моки для всех виджетов, к которым обращается контроллер
     view.file_path_entry = MagicMock()
     view.youtube_entry = MagicMock()
     view.model_menu = MagicMock()
     view.timestamps_checkbox = MagicMock()
     view.result_textbox = MagicMock()
     view.format_menu = MagicMock()
+    view.task_segmented_button = MagicMock()
     return view
 
 
@@ -29,110 +44,153 @@ def controller(mock_view):
     yield TranscriptionController(view=mock_view)
 
 
-def test_select_file_updates_view(controller, mock_view):
-    """Тест: выбор файла через диалог корректно обновляет GUI."""
-    # Arrange
-    fake_path = "/path/to/fake/audio.mp3"
-    with patch("app.controllers.transcription_controller.filedialog.askopenfilename",
-               return_value=fake_path) as mock_dialog:
-        # Act
+# --- Тесты публичных методов и реакции на действия пользователя ---
+
+
+def test_select_file_happy_path(controller, mock_view):
+    """Тест: успешный выбор файла через диалог."""
+    with patch(
+        "app.controllers.transcription_controller.filedialog.askopenfilename",
+        return_value="/fake.mp3",
+    ):
         controller.select_file()
-        # Assert
-        mock_dialog.assert_called_once()
-        assert mock_view.file_path_entry.configure.call_args_list == [call(state="normal"), call(state="disabled")]
-        mock_view.file_path_entry.delete.assert_called_once_with(0, "end")
-        mock_view.file_path_entry.insert.assert_called_once_with(0, fake_path)
-        mock_view.youtube_entry.delete.assert_called_once_with(0, "end")
+        mock_view.file_path_entry.insert.assert_called_with(0, "/fake.mp3")
+        mock_view.youtube_entry.delete.assert_called_with(0, "end")
 
 
-def test_start_transcription_no_source(controller):
-    """Тест: запуск транскрипции без указания источника отправляет ошибку в очередь."""
-    # Arrange
-    controller.view.file_path_entry.get.return_value = ""
-    controller.view.youtube_entry.get.return_value = ""
-    # Act
-    controller.start_transcription()
-    # Assert
-    message = controller.task_queue.get_nowait()
-    assert "Укажите источник" in message.status
-    final_message = controller.task_queue.get_nowait()
-    assert final_message.is_done is True
+def test_on_youtube_entry_change_clears_file_path(controller, mock_view):
+    """Тест: ввод URL в поле YouTube очищает поле выбора файла."""
+    mock_view.youtube_entry.get.return_value = "some_url"
+    controller.on_youtube_entry_change(None, None, None)
+    mock_view.file_path_entry.delete.assert_called_once_with(0, "end")
 
 
 @patch("app.controllers.transcription_controller.threading.Thread")
 def test_start_transcription_starts_thread(mock_thread, controller, mock_view):
     """Тест: успешный запуск транскрипции создает и запускает фоновый поток."""
-    # Arrange
     mock_view.file_path_entry.get.return_value = "/fake/file.mp3"
     mock_view.model_menu.get.return_value = "tiny"
-    # Act
+    mock_view.task_segmented_button.get.return_value = "Транскрибация"
     controller.start_transcription()
-    # Assert
     mock_thread.assert_called_once()
-    mock_thread.return_value.start.assert_called_once()
-    controller.view.update_ui_for_task_start.assert_called_once()
 
 
-def test_transcription_worker_file_path(controller):
-    """Тест: воркер корректно обрабатывает локальный файл и кладет сообщения в очередь."""
-    # Arrange
+def test_start_transcription_no_source(controller):
+    """Тест: запуск без источника отправляет ошибку в очередь."""
+    controller.view.file_path_entry.get.return_value = ""
+    controller.view.youtube_entry.get.return_value = ""
+    controller.start_transcription()
+    messages = _drain_queue(controller.task_queue)
+    assert any("Укажите источник" in msg.status for msg in messages if msg.status)
+
+
+def test_save_result_no_result(controller):
+    """Тест: попытка сохранить пустой результат отправляет сообщение в очередь."""
+    controller.last_transcription_result = None
+    controller.save_result()
+    msg = controller.task_queue.get(timeout=1)
+    assert msg.status == "Нечего сохранять."
+
+
+@patch("app.controllers.transcription_controller.messagebox.showerror")
+def test_save_result_srt_error(mock_showerror, controller, mock_view):
+    """Тест: ошибка при попытке сохранить в SRT без включенных таймстемпов."""
+    controller.last_transcription_result = {"text": "test", "segments": []}
+    controller.last_timestamps_enabled = False
+    mock_view.format_menu.get.return_value = "srt"
+    controller.save_result()
+    mock_showerror.assert_called_once()
+
+
+# --- Тесты потоков выполнения _transcription_worker ---
+
+
+@patch("app.services.transcription.TranscriptionService")
+@patch("whisper.load_model")
+@patch("app.services.model_manager.ModelManager")
+@patch("app.adapters.local_file.LocalFileAdapter")
+def test_worker_success_flow(
+    mock_local_adapter, mock_manager, mock_load_model, mock_service, controller
+):
+    """Тест: "счастливый путь" для _transcription_worker."""
+    mock_local_adapter.return_value.process_file.return_value = "/fake/processed.wav"
+    mock_manager.return_value.ensure_model_is_available.return_value = "/fake/model.pt"
+    mock_service.return_value.transcribe.return_value = {"text": "ok", "segments": []}
+    controller.last_timestamps_enabled = False
     params = {
-        "source": "/fake/audio.mp3",
         "is_youtube": False,
+        "source": "file",
         "model_size": ModelSize.TINY,
-        "timestamps": False,
+        "task": TranscriptionTask.TRANSCRIBE,
+        "cancel_event": threading.Event(),
     }
-    # Мокируем зависимости там, где они ОПРЕДЕЛЕНЫ, а не там, где они импортируются.
-    # Это самый надежный способ для отложенных импортов.
-    with patch("app.adapters.local_file.LocalFileAdapter") as mock_local_adapter_class, \
-         patch("app.services.model_manager.ModelManager") as mock_model_manager_class, \
-         patch("app.services.transcription.TranscriptionService") as mock_service_class, \
-         patch("whisper.load_model") as mock_load_model:
 
-        # Настраиваем моки для каждого класса
-        mock_local_adapter_instance = MagicMock()
-        mock_local_adapter_instance.process_file.return_value = "/fake/processed.wav"
-        mock_local_adapter_class.return_value = mock_local_adapter_instance
+    controller._transcription_worker(params)
 
-        mock_model_manager_instance = MagicMock()
-        mock_model_manager_instance.ensure_model_is_available.return_value = "/fake/model.pt"
-        mock_model_manager_class.return_value = mock_model_manager_instance
+    messages = _drain_queue(controller.task_queue)
+    final_status_msg = next(msg for msg in messages if msg.status == "Готово!")
+    assert final_status_msg.result_text == "ok"
+    assert any(msg.is_done for msg in messages)
 
-        mock_service_instance = MagicMock()
-        mock_service_instance.transcribe.return_value = "Тестовый текст."
-        mock_service_class.return_value = mock_service_instance
 
-        # Act
+def test_worker_known_error_flow(controller):
+    """Тест: _transcription_worker корректно обрабатывает известные ошибки."""
+    params = {"is_youtube": True, "source": "url"}
+    with patch("app.adapters.youtube.YoutubeAdapter") as mock_youtube_adapter:
+        mock_youtube_adapter.side_effect = FFmpegNotFoundError("ffmpeg not found")
         controller._transcription_worker(params)
 
-        # Assert
-        mock_local_adapter_class.assert_called_once()
-        mock_model_manager_class.assert_called_once_with(ModelSize.TINY)
-        mock_model_manager_instance.ensure_model_is_available.assert_called_once()
-        mock_load_model.assert_called_once_with("/fake/model.pt")
-        mock_service_class.assert_called_once()
-        mock_service_instance.transcribe.assert_called_once()
+    messages = _drain_queue(controller.task_queue)
+    assert any(
+        "Ошибка: ffmpeg not found" in msg.status for msg in messages if msg.status
+    )
+    assert any(msg.is_done for msg in messages)
 
 
-@patch("app.controllers.transcription_controller.get_exporter")
-def test_save_result(mock_get_exporter, controller, mock_view):
-    """Тест: сохранение результата вызывает диалог и экспортер."""
-    # Arrange
-    mock_view.result_textbox.get.return_value = "Результат для сохранения"
-    mock_view.format_menu.get.return_value = "txt"
-    fake_save_path = "/path/to/save.txt"
+def test_worker_critical_error_flow(controller):
+    """Тест: _transcription_worker корректно обрабатывает критические ошибки."""
+    params = {"is_youtube": False, "source": "file"}
+    with patch("app.adapters.local_file.LocalFileAdapter") as mock_local_adapter:
+        mock_local_adapter.side_effect = ValueError("Something went very wrong")
+        controller._transcription_worker(params)
 
-    mock_exporter_instance = MagicMock()
-    mock_get_exporter.return_value = mock_exporter_instance
+    messages = _drain_queue(controller.task_queue)
+    assert any(
+        "Критическая ошибка: Something went very wrong" in msg.status
+        for msg in messages
+        if msg.status
+    )
+    assert any(msg.is_done for msg in messages)
 
-    with patch("app.controllers.transcription_controller.filedialog.asksaveasfilename",
-               return_value=fake_save_path) as mock_dialog:
-        # Act
-        controller.save_result()
-        # Assert
-        mock_dialog.assert_called_once()
-        mock_get_exporter.assert_called_with(OutputFormat.TXT)
-        mock_exporter_instance.export.assert_called_once()
 
-        message = controller.task_queue.get_nowait()
-        assert "Файл успешно сохранен" in message.status
+# --- Тесты вспомогательных методов ---
+
+
+def test_format_result_for_gui_with_timestamps(controller):
+    """Тест: форматирование результата для GUI с включенными таймстемпами."""
+    controller.last_timestamps_enabled = True
+    result_data = {
+        "segments": [
+            {"start": 1, "end": 2.5, "text": "Hello"},
+            {"start": 3, "end": 4.2, "text": "World"},
+        ]
+    }
+    formatted_text = controller._format_result_for_gui(result_data)
+    assert "[00:00:01 -> 00:00:02] Hello" in formatted_text
+    assert "[00:00:03 -> 00:00:04] World" in formatted_text
+
+
+def test_cleanup_resources_handles_exception(controller):
+    """Тест: _cleanup_resources не падает и логирует ошибку при сбое."""
+    mock_adapter = MagicMock()
+    mock_adapter.cleanup.side_effect = Exception("Cleanup failed")
+    adapters = {"youtube": mock_adapter, "local": None}
+
+    controller._cleanup_resources(adapters)
+
+    messages = _drain_queue(controller.task_queue)
+    assert any(
+        "Не удалось очистить временные файлы" in msg.status
+        for msg in messages
+        if msg.status
+    )

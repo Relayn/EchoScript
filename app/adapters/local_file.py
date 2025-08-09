@@ -1,6 +1,7 @@
 """
 Адаптер для предварительной обработки локальных медиафайлов.
 """
+
 import os
 import pathlib
 import shutil
@@ -9,6 +10,7 @@ import tempfile
 from typing import Callable, Optional
 
 from app.adapters.youtube import FFmpegNotFoundError
+from app.core.utils import find_ffmpeg_path
 
 
 class LocalFileAdapter:
@@ -19,13 +21,15 @@ class LocalFileAdapter:
 
     def __init__(self):
         self._temp_dir = tempfile.mkdtemp(prefix="echoscript_local_")
-        self.ffmpeg_path = shutil.which("ffmpeg")
+        self.ffmpeg_path = find_ffmpeg_path()
         if not self.ffmpeg_path:
             raise FFmpegNotFoundError(
                 "Для обработки локальных файлов необходим ffmpeg, но он не найден."
             )
 
-    def process_file(self, source_path: str, log_callback: Optional[Callable[[str], None]] = None) -> str:
+    def process_file(
+        self, source_path: str, log_callback: Optional[Callable[[str], None]] = None
+    ) -> str:
         """
         Конвертирует исходный файл в временный WAV-файл.
         """
@@ -36,12 +40,24 @@ class LocalFileAdapter:
         output_path = os.path.join(self._temp_dir, output_filename)
 
         command = [
-            self.ffmpeg_path, "-i", str(source_path_obj),
-            "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-y", output_path,
+            self.ffmpeg_path,
+            "-i",
+            str(source_path_obj),
+            "-vn",
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            "-y",
+            output_path,
         ]
 
         try:
-            subprocess.run(command, check=True, capture_output=True, text=True, encoding="utf-8")
+            subprocess.run(
+                command, check=True, capture_output=True, text=True, encoding="utf-8"
+            )
             if log_callback:
                 log_callback(f"Файл успешно конвертирован в: {output_path}")
             return output_path
@@ -49,7 +65,10 @@ class LocalFileAdapter:
             if log_callback:
                 log_callback("Ошибка при конвертации файла с помощью ffmpeg:")
                 log_callback(f"Stderr: {e.stderr}")
-            raise IOError(f"Не удалось обработать файл '{source_path_obj.name}' с помощью ffmpeg.")
+            msg = (
+                f"Не удалось обработать файл '{source_path_obj.name}' с помощью ffmpeg."
+            )
+            raise IOError(msg) from e
         except Exception as e:
             if log_callback:
                 log_callback(f"Непредвиденная ошибка в LocalFileAdapter: {e}")

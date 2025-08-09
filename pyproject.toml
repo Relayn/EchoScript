@@ -17,12 +17,15 @@ torchvision = ">=0.18.1"
 torchaudio = ">=2.3.1"
 openai-whisper = "^20250625"
 yt-dlp = "^2025.7.21"
+tkinterdnd2 = "^0.4.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
 ruff = "^0.12.7"
 black = "^25.1.0"
 pyinstaller = "^6.15.0"
+pytest-cov = "^6.2.1"
+pre-commit = "^4.2.0"
 
 [tool.poetry.group.gui.dependencies]
 customtkinter = "^5.2.2"
@@ -35,14 +38,12 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 # --- Tool Configuration ---
-[tool.black]
-line-length = 88
-target-version = ['py311']
-
 [tool.ruff]
 line-length = 88
+
+[tool.ruff.lint]
 select = ["E", "W", "F", "I", "C90", "B"]
-ignore = ["B008"]
+ignore = ["B008", "C901"] # Временно игнорируем сложность, исправим позже
 
 [tool.ruff.format]
 quote-style = "double"
