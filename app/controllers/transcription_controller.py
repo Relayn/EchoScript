@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from app.adapters.export import get_exporter
 from app.core.models import ModelSize, OutputFormat, TranscriptionTask
+from app.services.realtime_transcription import RealtimeTranscriptionService
 
 if TYPE_CHECKING:
     from app.gui_main import App
@@ -25,6 +26,7 @@ class QueueMessage(BaseModel):
     status: Optional[str] = None
     progress: Optional[float] = None
     result_text: Optional[str] = None
+    partial_result: Optional[str] = None  # Для real-time результатов
     is_done: bool = False
 
 
@@ -37,9 +39,12 @@ class TranscriptionController:
         self.view = view
         self.task_queue = queue.Queue()
         self.is_running = False
+        self.is_recording = False
         self.last_transcription_result: Optional[dict] = None
         self.last_timestamps_enabled: bool = False
         self.cancel_event: Optional[threading.Event] = None
+        self.realtime_service: Optional[RealtimeTranscriptionService] = None
+        self.realtime_full_text: str = ""
 
     def _log_to_queue(self, message: str):
         """Отправляет статусное сообщение в очередь GUI."""
@@ -159,6 +164,85 @@ class TranscriptionController:
             self._log_to_queue(f"Файл успешно сохранен: {file_path}")
         except Exception as e:
             self._log_to_queue(f"Ошибка при сохранении файла: {e}")
+
+    def _log_to_status_bar(self, message: str):
+        """Отправляет только статусное сообщение в очередь GUI."""
+        self.task_queue.put(QueueMessage(status=message))
+
+    def _on_realtime_result(self, partial_text: str):
+        """Callback для получения частичного результата от Realtime сервиса."""
+        self.realtime_full_text += partial_text + " "
+        self.task_queue.put(QueueMessage(partial_result=partial_text + " "))
+
+    def toggle_realtime_transcription(self):
+        """Переключает состояние записи с микрофона."""
+        if self.is_recording:
+            if self.realtime_service:
+                self.realtime_service.stop()
+                self.realtime_service = None
+            self.is_recording = False
+            self.view.update_ui_for_recording_end()
+        else:
+            self.is_recording = True
+            self.view.update_ui_for_recording_start()
+            self.realtime_full_text = ""  # Сбрасываем текст перед началом
+
+            selected_task_str = self.view.task_segmented_button.get()
+            task = (
+                TranscriptionTask.TRANSLATE
+                if selected_task_str == "Перевод"
+                else TranscriptionTask.TRANSCRIBE
+            )
+            mic_id_str = self.view.mic_menu.get()
+            try:
+                mic_id = int(mic_id_str.split("ID: ")[1].strip(")"))
+            except (IndexError, ValueError):
+                self._log_to_status_bar("Ошибка: Не удалось определить ID микрофона.")
+                self.is_recording = False
+                self.view.update_ui_for_recording_end()
+                return
+
+            params = {
+                "model_size": ModelSize(self.view.model_menu.get()),
+                "task": task,
+                "mic_id": mic_id,
+            }
+            thread = threading.Thread(
+                target=self._realtime_worker_start, args=(params,)
+            )
+            thread.daemon = True
+            thread.start()
+
+    def _realtime_worker_start(self, params: dict):
+        """Загружает модель и запускает сервис записи в фоновом потоке."""
+        import whisper
+
+        from app.services.model_manager import ModelManager
+
+        try:
+            manager = ModelManager(params["model_size"])
+            model_path = manager.ensure_model_is_available(
+                log_callback=self._log_to_status_bar
+            )
+            self._log_to_status_bar(
+                f"Загрузка модели '{params['model_size'].value}' в память..."
+            )
+            model = whisper.load_model(model_path)
+
+            self.realtime_service = RealtimeTranscriptionService(
+                model=model,
+                device_id=params["mic_id"],
+                task=params["task"].value,
+                result_callback=self._on_realtime_result,
+                status_callback=self._log_to_status_bar,
+            )
+            self.realtime_service.start()
+
+        except Exception as e:
+            self._log_to_status_bar(f"Критическая ошибка при запуске записи: {e}")
+            self.is_recording = False
+            # Отправляем сообщение в основной поток для обновления GUI
+            self.task_queue.put(QueueMessage(is_done=True))
 
     def _transcription_worker(self, params: dict):
         from app.adapters.youtube import FFmpegNotFoundError

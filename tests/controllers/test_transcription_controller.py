@@ -14,6 +14,7 @@ from app.controllers.transcription_controller import (
     TranscriptionController,
 )
 from app.core.models import ModelSize, TranscriptionTask
+from app.services.realtime_transcription import RealtimeTranscriptionService
 
 
 def _drain_queue(q: queue.Queue) -> list[QueueMessage]:
@@ -194,3 +195,92 @@ def test_cleanup_resources_handles_exception(controller):
         for msg in messages
         if msg.status
     )
+
+
+# --- Тесты для Real-time транскрипции ---
+
+
+@patch("app.controllers.transcription_controller.threading.Thread")
+def test_toggle_realtime_transcription_starts_recording(
+    mock_thread, controller, mock_view
+):
+    """Тест: toggle_realtime_transcription успешно запускает запись."""
+    # Arrange
+    controller.is_recording = False
+    mock_view.task_segmented_button.get.return_value = "Транскрибация"
+    mock_view.mic_menu.get.return_value = "Fake Mic (ID: 1)"
+    mock_view.model_menu.get.return_value = "tiny"
+
+    # Act
+    controller.toggle_realtime_transcription()
+
+    # Assert
+    assert controller.is_recording is True
+    mock_view.update_ui_for_recording_start.assert_called_once()
+    mock_thread.assert_called_once()
+    # Проверяем, что воркер запускается с правильными параметрами
+    call_args = mock_thread.call_args
+    assert call_args.kwargs["target"] == controller._realtime_worker_start
+
+
+def test_toggle_realtime_transcription_stops_recording(controller, mock_view):
+    """Тест: toggle_realtime_transcription успешно останавливает запись."""
+    # Arrange
+    controller.is_recording = True
+    # "Захватываем" мок в локальную переменную
+    mock_service_instance = MagicMock(spec=RealtimeTranscriptionService)
+    controller.realtime_service = mock_service_instance
+
+    # Act
+    controller.toggle_realtime_transcription()
+
+    # Assert
+    assert controller.is_recording is False
+    # Выполняем проверку на локальной переменной
+    mock_service_instance.stop.assert_called_once()
+    assert controller.realtime_service is None
+    mock_view.update_ui_for_recording_end.assert_called_once()
+
+
+@patch("app.controllers.transcription_controller.RealtimeTranscriptionService")
+@patch("whisper.load_model")
+@patch("app.services.model_manager.ModelManager")
+def test_realtime_worker_start_success(
+    mock_manager, mock_load_model, mock_realtime_service, controller
+):
+    """Тест: _realtime_worker_start успешно инициализирует и запускает сервис."""
+    # Arrange
+    params = {
+        "model_size": ModelSize.TINY,
+        "task": TranscriptionTask.TRANSCRIBE,
+        "mic_id": 1,
+    }
+    mock_manager.return_value.ensure_model_is_available.return_value = "/fake/model.pt"
+
+    # Act
+    controller._realtime_worker_start(params)
+
+    # Assert
+    mock_manager.assert_called_once_with(ModelSize.TINY)
+    mock_load_model.assert_called_once_with("/fake/model.pt")
+    mock_realtime_service.assert_called_once()
+    # Проверяем, что у созданного экземпляра сервиса был вызван метод start
+    mock_realtime_service.return_value.start.assert_called_once()
+
+
+@patch("app.services.model_manager.ModelManager")
+def test_realtime_worker_start_handles_exception(mock_manager, controller):
+    """Тест: _realtime_worker_start обрабатывает исключение и обновляет GUI."""
+    # Arrange
+    params = {"model_size": ModelSize.TINY, "task": "task", "mic_id": 1}
+    mock_manager.side_effect = Exception("Model load failed")
+    controller.is_recording = True  # Имитируем состояние "в процессе запуска"
+
+    # Act
+    controller._realtime_worker_start(params)
+
+    # Assert
+    assert controller.is_recording is False
+    messages = _drain_queue(controller.task_queue)
+    assert any("Критическая ошибка" in msg.status for msg in messages if msg.status)
+    assert any(msg.is_done for msg in messages)
