@@ -4,7 +4,7 @@
 
 import queue
 import threading
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 import sounddevice as sd
@@ -43,18 +43,20 @@ class RealtimeTranscriptionService:
         self.result_callback = result_callback
         self.status_callback = status_callback
 
-        self._audio_queue = queue.Queue()
+        self._audio_queue: queue.Queue[np.ndarray] = queue.Queue()
         self._processing_thread: threading.Thread | None = None
         self._stream: sd.InputStream | None = None
         self._stop_event = threading.Event()
 
-    def _audio_callback(self, indata: np.ndarray, frames: int, time, status):
+    def _audio_callback(
+        self, indata: np.ndarray, frames: int, time: Any, status: Any
+    ) -> None:
         """Этот callback вызывается из потока sounddevice для каждого блока аудио."""
         if status:
             self.status_callback(f"Ошибка аудиопотока: {status}")
         self._audio_queue.put(indata.copy())
 
-    def _processing_worker(self):
+    def _processing_worker(self) -> None:
         """
         Рабочий поток, который извлекает аудио из очереди, накапливает его
         и отправляет в Whisper для транскрипции.
@@ -73,7 +75,11 @@ class RealtimeTranscriptionService:
                 if len(processing_buffer) >= PROCESSING_QUEUE_SIZE:
                     self.status_callback("Обработка фрагмента...")
 
-                    options = {"language": None, "verbose": False, "task": self.task}
+                    options: dict[str, Any] = {
+                        "language": None,
+                        "verbose": False,
+                        "task": self.task,
+                    }
                     result = self.model.transcribe(audio=processing_buffer, **options)
 
                     transcribed_text = result.get("text", "").strip()
@@ -91,7 +97,7 @@ class RealtimeTranscriptionService:
                 self.status_callback(f"Ошибка в потоке обработки: {e}")
                 break
 
-    def start(self):
+    def start(self) -> None:
         """Запускает аудиопоток и рабочий поток обработки."""
         self.status_callback("Запуск записи...")
         self._stop_event.clear()
@@ -111,7 +117,7 @@ class RealtimeTranscriptionService:
         self._stream.start()
         self.status_callback("Ожидание аудио...")
 
-    def stop(self):
+    def stop(self) -> None:
         """Останавливает аудиопоток и рабочий поток."""
         if not self._stop_event.is_set():
             self.status_callback("Остановка записи...")

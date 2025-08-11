@@ -1,17 +1,17 @@
 """
 Интеграционные тесты для YoutubeAdapter.
 """
-import os
+
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yt_dlp
 
-from app.adapters.youtube import YoutubeAdapter, FFmpegNotFoundError
+from app.adapters.youtube import FFmpegNotFoundError, YoutubeAdapter
 
 
-def test_adapter_raises_error_if_ffmpeg_not_found():
+def test_adapter_raises_error_if_ffmpeg_not_found() -> None:
     """
     Проверяет, что конструктор вызывает FFmpegNotFoundError, если ffmpeg не найден.
     """
@@ -23,7 +23,7 @@ def test_adapter_raises_error_if_ffmpeg_not_found():
 
 
 @patch("shutil.which", return_value="/fake/path/to/ffmpeg")
-def test_download_audio_handles_yt_dlp_error(mock_which):
+def test_download_audio_handles_yt_dlp_error(mock_which: MagicMock) -> None:
     """
     Проверяет, что адаптер корректно обрабатывает ошибку загрузки от yt-dlp.
     """
@@ -47,7 +47,7 @@ def test_download_audio_handles_yt_dlp_error(mock_which):
 
 
 @patch("shutil.which", return_value="/fake/path/to/ffmpeg")
-def test_download_audio_success_path(mock_which):
+def test_download_audio_success_path(mock_which: MagicMock) -> None:
     """
     Проверяет успешный сценарий: ffmpeg найден, видео загружено и сконвертировано.
     """
@@ -60,17 +60,20 @@ def test_download_audio_success_path(mock_which):
     expected_wav_path = source_m4a_path.with_suffix(".wav")
 
     # Мокируем yt_dlp и subprocess
-    with patch("yt_dlp.YoutubeDL") as mock_yt_dlp, \
-         patch("subprocess.run") as mock_subprocess:
-
+    with (
+        patch("yt_dlp.YoutubeDL") as mock_yt_dlp,
+        patch("subprocess.run") as mock_subprocess,
+    ):
         mock_yt_instance = mock_yt_dlp.return_value.__enter__.return_value
         mock_yt_instance.extract_info.return_value = {
-            "title": "Test Video", "duration_string": "01:23",
+            "title": "Test Video",
+            "duration_string": "01:23",
         }
 
         # Имитируем, что yt-dlp создал .m4a файл
-        def fake_download(*args, **kwargs):
+        def fake_download(*args: list[str], **kwargs: dict[str, str]) -> None:
             source_m4a_path.touch()
+
         mock_yt_instance.download.side_effect = fake_download
 
         # Act

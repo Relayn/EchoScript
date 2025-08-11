@@ -2,6 +2,7 @@
 Этот модуль отвечает за управление моделями Whisper, включая их
 загрузку, кэширование и проверку целостности.
 """
+
 import hashlib
 import os
 import urllib.request
@@ -30,7 +31,9 @@ class ModelManager:
         """
         if not self.is_model_downloaded(log_callback):
             if log_callback:
-                log_callback(f"Модель '{self.model_size}' не найдена. Начинаю загрузку...")
+                log_callback(
+                    f"Модель '{self.model_size}' не найдена. Начинаю загрузку..."
+                )
             self._download_model(progress_callback, log_callback)
         else:
             if log_callback:
@@ -38,7 +41,9 @@ class ModelManager:
 
         return self.download_path
 
-    def is_model_downloaded(self, log_callback: Optional[Callable[[str], None]] = None) -> bool:
+    def is_model_downloaded(
+        self, log_callback: Optional[Callable[[str], None]] = None
+    ) -> bool:
         """Проверяет, существует ли файл модели и соответствует ли его SHA256."""
         if not os.path.exists(self.download_path):
             return False
@@ -62,13 +67,13 @@ class ModelManager:
         self,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         log_callback: Optional[Callable[[str], None]] = None,
-    ):
+    ) -> None:
         """Реализует атомарную загрузку модели и сообщает о прогрессе через callback."""
         url = whisper._MODELS[self.model_size]
         part_path = self.download_path + ".part"
 
         try:
-            with urllib.request.urlopen(url) as source, open(part_path, "wb") as output:
+            with urllib.request.urlopen(url) as source, open(part_path, "wb") as output:  # nosec B310
                 total_size = int(source.info().get("Content-Length", 0))
                 total_mb = total_size / (1024 * 1024)
                 downloaded_bytes = 0
@@ -93,7 +98,9 @@ class ModelManager:
 
             os.rename(part_path, self.download_path)
             if log_callback:
-                log_callback(f"Модель '{self.model_size}' успешно загружена и проверена.")
+                log_callback(
+                    f"Модель '{self.model_size}' успешно загружена и проверена."
+                )
 
         except Exception as e:
             if log_callback:

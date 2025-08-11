@@ -7,6 +7,7 @@
 
 import queue
 from tkinter import TclError, messagebox
+from typing import Any
 
 import customtkinter as ctk
 import sounddevice as sd
@@ -19,7 +20,7 @@ from app.controllers.transcription_controller import (
 from app.core.models import ModelSize, OutputFormat
 
 
-class App(ctk.CTk, TkinterDnD.DnDWrapper):
+class App(ctk.CTk, TkinterDnD.DnDWrapper):  # type: ignore[misc]
     """
     Главный класс приложения, который инкапсулирует окно и его компоненты.
     Наследуется от CTk и DnDWrapper для поддержки Drag-n-Drop.
@@ -28,7 +29,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     TAB_FILE = "Из файла"
     TAB_REALTIME = "С микрофона"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         """
         Инициализирует главное окно приложения и его базовую структуру.
         """
@@ -65,19 +66,20 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         # --- Запуск обработчика очереди ---
         self.after(100, self._process_queue)
 
-    def _on_drop(self, event):
+    def _on_drop(self, event: Any) -> None:
         """Обработчик события перетаскивания файла в окно."""
         if event.data:
+            # Простая обработка для одного файла
             first_path = event.data.split("}")[0].lstrip("{")
             self.controller.handle_source_path(first_path)
 
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         """Создает и размещает все виджеты в окне."""
         self._create_tab_view()
         self._create_main_frame()
         self._create_status_frame()
 
-    def _create_tab_view(self):
+    def _create_tab_view(self) -> None:
         """Создает и управляет вкладочным интерфейсом."""
         # Ограничиваем высоту области вкладок, чтобы не оставалось
         # лишнего пустого пространства
@@ -90,7 +92,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self._create_source_frame(self.tab_view.tab(self.TAB_FILE))
         self._create_realtime_frame(self.tab_view.tab(self.TAB_REALTIME))
 
-    def _create_source_frame(self, parent_tab):
+    def _create_source_frame(self, parent_tab: ctk.CTkFrame) -> None:
         """Создает фрейм для выбора источника (файл или URL)."""
         # Используем parent_tab как контейнер для grid
         parent_tab.grid_columnconfigure(1, weight=1)
@@ -119,7 +121,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         self.youtube_entry.grid(row=0, column=3, padx=(5, 0), pady=10, sticky="ew")
 
-    def _create_realtime_frame(self, parent_tab):
+    def _create_realtime_frame(self, parent_tab: ctk.CTkFrame) -> None:
         """Создает фрейм для транскрибации в реальном времени."""
         # Используем parent_tab как контейнер для grid
         parent_tab.grid_columnconfigure(1, weight=1)
@@ -158,7 +160,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.status_label.configure(text=f"Ошибка аудио: {e}")
             return []
 
-    def _create_main_frame(self):
+    def _create_main_frame(self) -> None:
         """Создает главный фрейм с настройками и полем для результата."""
         main_frame = ctk.CTkFrame(self)
         main_frame.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
@@ -225,7 +227,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.result_textbox = ctk.CTkTextbox(main_frame, wrap="word")
         self.result_textbox.grid(row=0, column=1, padx=(5, 10), pady=10, sticky="nsew")
 
-    def _create_status_frame(self):
+    def _create_status_frame(self) -> None:
         """Создает нижний фрейм для статус-бара и прогресс-бара."""
         status_frame = ctk.CTkFrame(self)
         status_frame.grid(row=2, column=0, padx=10, pady=(5, 10), sticky="sew")
@@ -240,7 +242,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.progress_bar.set(0)
         self.progress_bar.grid(row=0, column=1, padx=10, pady=5, sticky="e")
 
-    def _on_model_select(self, model_name: str):
+    def _on_model_select(self, model_name: str) -> None:
         """Показывает предупреждение при выборе ресурсоемких моделей."""
         if model_name in [ModelSize.MEDIUM.value, ModelSize.LARGE.value]:
             messagebox.showinfo(
@@ -252,7 +254,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 "медленной или привести к ошибкам нехватки памяти.",
             )
 
-    def _on_task_select(self, selected_task: str):
+    def _on_task_select(self, selected_task: str) -> None:
         """Обрабатывает выбор задачи, отключая таймстемпы для перевода."""
         if selected_task == "Перевод":
             self.timestamps_checkbox.deselect()
@@ -263,7 +265,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.timestamps_checkbox.configure(state="normal")
             self.format_menu.configure(state="normal")
 
-    def _process_queue(self):
+    def _process_queue(self) -> None:
         """Обрабатывает сообщения из очереди, приходящие из рабочего потока."""
         try:
             message: QueueMessage = self.controller.task_queue.get_nowait()
@@ -286,7 +288,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         finally:
             self.after(100, self._process_queue)
 
-    def update_ui_for_task_start(self):
+    def update_ui_for_task_start(self) -> None:
         """Блокирует элементы управления на время выполнения задачи."""
         self.start_button.configure(
             state="normal", text="Отмена", command=self.controller.cancel_transcription
@@ -304,7 +306,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.record_button.configure(state="disabled")
         self.tab_view.configure(state="disabled")
 
-    def update_ui_for_task_end(self):
+    def update_ui_for_task_end(self) -> None:
         """Разблокирует элементы управления после завершения задачи."""
         self.start_button.configure(
             state="normal", text="Старт", command=self.controller.start_transcription
@@ -324,7 +326,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         # Восстанавливаем состояние виджетов в зависимости от выбранной задачи
         self._on_task_select(self.task_segmented_button.get())
 
-    def update_ui_for_recording_start(self):
+    def update_ui_for_recording_start(self) -> None:
         """Обновляет UI при начале записи с микрофона."""
         self.record_button.configure(text="Остановить запись")
         self.save_button.configure(state="disabled")
@@ -335,7 +337,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.tab_view.configure(state="disabled")
         self.tab_view.set(self.TAB_REALTIME)
 
-    def update_ui_for_recording_end(self):
+    def update_ui_for_recording_end(self) -> None:
         """Восстанавливает UI после окончания записи."""
         self.record_button.configure(text="Начать запись")
         self.save_button.configure(state="normal")

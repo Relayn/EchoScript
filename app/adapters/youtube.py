@@ -6,7 +6,7 @@
 import os
 import pathlib
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import tempfile
 from typing import Callable, Optional
 
@@ -18,21 +18,17 @@ from app.core.utils import find_ffmpeg_path
 class YoutubeAdapterError(Exception):
     """Пользовательское исключение для ошибок YoutubeAdapter."""
 
-    pass
-
 
 class FFmpegNotFoundError(YoutubeAdapterError):
     """Исключение, вызываемое, когда ffmpeg не найден в системе."""
-
-    pass
 
 
 class YoutubeAdapter:
     """Обрабатывает загрузку аудио с URL-адресов YouTube с помощью yt-dlp."""
 
-    def __init__(self):
-        self._temp_dir = tempfile.mkdtemp(prefix="echoscript_")
-        self.ffmpeg_path = find_ffmpeg_path()
+    def __init__(self) -> None:
+        self._temp_dir: str = tempfile.mkdtemp(prefix="echoscript_")
+        self.ffmpeg_path: Optional[str] = find_ffmpeg_path()
         if not self.ffmpeg_path:
             msg = (
                 "Для работы с YouTube необходим ffmpeg, "
@@ -79,6 +75,9 @@ class YoutubeAdapter:
                 if log_callback:
                     log_callback("Конвертация в стандартный формат WAV...")
 
+                if not self.ffmpeg_path:
+                    raise FFmpegNotFoundError("Путь к ffmpeg не определен.")
+
                 output_wav_path = str(pathlib.Path(source_m4a_path).with_suffix(".wav"))
                 command = [
                     self.ffmpeg_path,
@@ -94,7 +93,7 @@ class YoutubeAdapter:
                     "-y",
                     output_wav_path,
                 ]
-                subprocess.run(
+                subprocess.run(  # nosec B603
                     command,
                     check=True,
                     capture_output=True,
@@ -118,7 +117,7 @@ class YoutubeAdapter:
             self.cleanup(log_callback)
             return None
 
-    def cleanup(self, log_callback: Optional[Callable[[str], None]] = None):
+    def cleanup(self, log_callback: Optional[Callable[[str], None]] = None) -> None:
         """Удаляет временную директорию и все ее содержимое."""
         if os.path.exists(self._temp_dir):
             try:

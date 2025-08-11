@@ -1,9 +1,11 @@
 """
 Юнит-тесты для ModelManager, отвечающего за загрузку моделей.
 """
+
 import hashlib
 import os
-from unittest.mock import patch, MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -12,15 +14,20 @@ from app.services.model_manager import ModelManager
 
 
 @pytest.fixture
-def model_manager(tmp_path) -> ModelManager:
+def model_manager(tmp_path: Path) -> ModelManager:
     """Фикстура для создания экземпляра ModelManager с временной директорией."""
     # Используем monkeypatch, чтобы переопределить корневую директорию для кэша
-    with patch("app.services.model_manager.ModelManager._get_download_root", return_value=str(tmp_path)):
+    with patch(
+        "app.services.model_manager.ModelManager._get_download_root",
+        return_value=str(tmp_path),
+    ):
         manager = ModelManager(ModelSize.TINY)
         return manager
 
 
-def test_ensure_model_is_available_already_downloaded_and_valid(model_manager, tmp_path):
+def test_ensure_model_is_available_already_downloaded_and_valid(
+    model_manager: ModelManager, tmp_path: Path
+) -> None:
     """
     Тест: модель уже существует и ее контрольная сумма верна.
     Ожидание: новая загрузка не происходит.
@@ -32,7 +39,9 @@ def test_ensure_model_is_available_already_downloaded_and_valid(model_manager, t
     model_path.write_bytes(dummy_content)
 
     # Мокаем словарь _MODELS, чтобы подставить наш ожидаемый хеш
-    with patch("whisper._MODELS", {"tiny": f"https://example.com/{dummy_hash}/tiny.pt"}):
+    with patch(
+        "whisper._MODELS", {"tiny": f"https://example.com/{dummy_hash}/tiny.pt"}
+    ):
         with patch.object(model_manager, "_download_model") as mock_download:
             # Act
             result_path = model_manager.ensure_model_is_available()
@@ -42,7 +51,9 @@ def test_ensure_model_is_available_already_downloaded_and_valid(model_manager, t
             assert result_path == str(model_path)
 
 
-def test_ensure_model_is_available_corrupted_file(model_manager, tmp_path):
+def test_ensure_model_is_available_corrupted_file(
+    model_manager: ModelManager, tmp_path: Path
+) -> None:
     """
     Тест: файл модели существует, но его контрольная сумма неверна.
     Ожидание: старый файл удаляется, запускается новая загрузка.
@@ -51,7 +62,9 @@ def test_ensure_model_is_available_corrupted_file(model_manager, tmp_path):
     (tmp_path / "tiny.pt").write_bytes(b"corrupted content")
     correct_hash = "a" * 64  # Заведомо неверный хеш
 
-    with patch("whisper._MODELS", {"tiny": f"https://example.com/{correct_hash}/tiny.pt"}):
+    with patch(
+        "whisper._MODELS", {"tiny": f"https://example.com/{correct_hash}/tiny.pt"}
+    ):
         with patch.object(model_manager, "_download_model") as mock_download:
             with patch("os.remove") as mock_remove:
                 # Act
@@ -63,9 +76,12 @@ def test_ensure_model_is_available_corrupted_file(model_manager, tmp_path):
 
 
 @patch("urllib.request.urlopen")
-def test_download_model_atomic_operation(mock_urlopen, model_manager, tmp_path):
+def test_download_model_atomic_operation(
+    mock_urlopen: MagicMock, model_manager: ModelManager, tmp_path: Path
+) -> None:
     """
-    Тест: _download_model выполняет атомарную загрузку (скачивание в .part, затем переименование).
+    Тест: _download_model выполняет атомарную загрузку
+    (скачивание в .part, затем переименование).
     """
     # Arrange
     dummy_content = b"newly downloaded content"
@@ -84,6 +100,6 @@ def test_download_model_atomic_operation(mock_urlopen, model_manager, tmp_path):
     # Assert
     # Проверяем, что временный .part файл был переименован в финальный,
     # а сам .part файл больше не существует.
-    assert os.path.exists(part_path) is False
-    assert os.path.exists(final_path) is True
+    assert not os.path.exists(part_path)
+    assert os.path.exists(final_path)
     assert (tmp_path / "tiny.pt").read_bytes() == dummy_content

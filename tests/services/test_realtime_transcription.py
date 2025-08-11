@@ -16,7 +16,7 @@ from app.services.realtime_transcription import (
 
 
 @pytest.fixture
-def mock_model():
+def mock_model() -> MagicMock:
     """Фикстура для мока модели Whisper."""
     model = MagicMock()
     model.transcribe.return_value = {"text": "test"}
@@ -24,13 +24,15 @@ def mock_model():
 
 
 @pytest.fixture
-def mock_callbacks():
+def mock_callbacks() -> dict[str, MagicMock]:
     """Фикстура для мока колбэков."""
     return {"result": MagicMock(), "status": MagicMock()}
 
 
 @pytest.fixture
-def service(mock_model, mock_callbacks):
+def service(
+    mock_model: MagicMock, mock_callbacks: dict[str, MagicMock]
+) -> RealtimeTranscriptionService:
     """Фикстура для создания экземпляра сервиса."""
     return RealtimeTranscriptionService(
         model=mock_model,
@@ -44,8 +46,10 @@ def service(mock_model, mock_callbacks):
 @patch("sounddevice.InputStream")
 @patch("threading.Thread")
 def test_start_initializes_stream_and_thread(
-    mock_thread_class, mock_stream_class, service
-):
+    mock_thread_class: MagicMock,
+    mock_stream_class: MagicMock,
+    service: RealtimeTranscriptionService,
+) -> None:
     """Тест: метод start() корректно инициализирует и запускает поток и стрим."""
     # Arrange
     mock_thread_instance = mock_thread_class.return_value
@@ -59,12 +63,16 @@ def test_start_initializes_stream_and_thread(
     mock_thread_instance.start.assert_called_once()
     mock_stream_class.assert_called_once()
     mock_stream_instance.start.assert_called_once()
-    assert service._stop_event.is_set() is False
+    assert not service._stop_event.is_set()
 
 
 @patch("sounddevice.InputStream")
 @patch("threading.Thread")
-def test_stop_stops_stream_and_thread(mock_thread_class, mock_stream_class, service):
+def test_stop_stops_stream_and_thread(
+    mock_thread_class: MagicMock,
+    mock_stream_class: MagicMock,
+    service: RealtimeTranscriptionService,
+) -> None:
     """Тест: метод stop() корректно останавливает поток и стрим."""
     # Arrange
     # "Захватываем" моки в локальные переменные до вызова тестируемого метода
@@ -78,15 +86,17 @@ def test_stop_stops_stream_and_thread(mock_thread_class, mock_stream_class, serv
 
     # Assert
     # Проверяем вызовы на локальных переменных, а не на атрибутах сервиса
-    assert service._stop_event.is_set() is True
+    assert service._stop_event.is_set()
     mock_stream_instance.stop.assert_called_once()
     mock_stream_instance.close.assert_called_once()
     mock_thread_instance.join.assert_called_once()
 
 
 def test_processing_worker_transcribes_and_calls_callbacks(
-    service, mock_model, mock_callbacks
-):
+    service: RealtimeTranscriptionService,
+    mock_model: MagicMock,
+    mock_callbacks: dict[str, MagicMock],
+) -> None:
     """
     Тест: рабочий поток правильно обрабатывает очередь, вызывает модель
     и передает результат в колбэки.
@@ -97,7 +107,7 @@ def test_processing_worker_transcribes_and_calls_callbacks(
     service._audio_queue.put(fake_audio_chunk)
 
     # Запускаем воркер в отдельном потоке, чтобы он мог выйти из цикла
-    def worker_wrapper():
+    def worker_wrapper() -> None:
         service._processing_worker()
 
     thread = threading.Thread(target=worker_wrapper)
@@ -116,7 +126,9 @@ def test_processing_worker_transcribes_and_calls_callbacks(
     mock_callbacks["result"].assert_called_with("test")
 
 
-def test_audio_callback_puts_data_in_queue(service):
+def test_audio_callback_puts_data_in_queue(
+    service: RealtimeTranscriptionService,
+) -> None:
     """Тест: аудио-колбэк помещает данные в очередь."""
     # Arrange
     rng = np.random.default_rng(seed=42)

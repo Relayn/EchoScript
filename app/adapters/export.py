@@ -5,7 +5,7 @@
 
 import abc
 import pathlib
-from typing import Dict, Type
+from typing import Any, Dict, Type
 
 from rich.console import Console
 
@@ -13,10 +13,14 @@ from app.core.models import OutputFormat
 
 console = Console()
 
+# Константа для сообщения об успешном сохранении
+_SUCCESS_SAVE_MESSAGE = "💾 [green]Результат сохранен в:[/green]"
+
 
 def _format_srt_time(seconds: float) -> str:
     """Конвертирует секунды в формат времени SRT (ЧЧ:ММ:СС,мс)."""
-    assert seconds >= 0, "Ожидается неотрицательная временная метка"
+    if seconds < 0:
+        raise ValueError("Ожидается неотрицательная временная метка")
     milliseconds = round(seconds * 1000.0)
 
     hours = int(milliseconds / 3_600_000)
@@ -36,8 +40,11 @@ class ExportAdapter(abc.ABC):
 
     @abc.abstractmethod
     def export(
-        self, result_data: dict, destination_path: pathlib.Path, silent: bool = True
-    ):
+        self,
+        result_data: dict[str, Any],
+        destination_path: pathlib.Path,
+        silent: bool = True,
+    ) -> None:
         """
         Сохраняет данные транскрипции в указанный путь.
 
@@ -54,13 +61,16 @@ class TxtExportAdapter(ExportAdapter):
     """Сохраняет транскрипцию в простой текстовый файл (.txt)."""
 
     def export(
-        self, result_data: dict, destination_path: pathlib.Path, silent: bool = True
-    ):
+        self,
+        result_data: dict[str, Any],
+        destination_path: pathlib.Path,
+        silent: bool = True,
+    ) -> None:
         """Сохраняет текст в файл с расширением .txt."""
         try:
             destination_path.write_text(result_data["text"], encoding="utf-8")
             if not silent:
-                console.print("💾 [green]Результат сохранен в:[/green]")
+                console.print(_SUCCESS_SAVE_MESSAGE)
                 console.print(f"[bold cyan]{destination_path}[/bold cyan]")
         except IOError as e:
             console.print(f"[bold red]❌ Ошибка при сохранении файла: {e}[/bold red]")
@@ -70,13 +80,16 @@ class MdExportAdapter(ExportAdapter):
     """Сохраняет транскрипцию в файл Markdown (.md)."""
 
     def export(
-        self, result_data: dict, destination_path: pathlib.Path, silent: bool = True
-    ):
+        self,
+        result_data: dict[str, Any],
+        destination_path: pathlib.Path,
+        silent: bool = True,
+    ) -> None:
         """Сохраняет текст в файл с расширением .md."""
         try:
             destination_path.write_text(result_data["text"], encoding="utf-8")
             if not silent:
-                console.print("💾 [green]Результат сохранен в:[/green]")
+                console.print(_SUCCESS_SAVE_MESSAGE)
                 console.print(f"[bold cyan]{destination_path}[/bold cyan]")
         except IOError as e:
             console.print(f"[bold red]❌ Ошибка при сохранении файла: {e}[/bold red]")
@@ -86,8 +99,11 @@ class SrtExportAdapter(ExportAdapter):
     """Сохраняет транскрипцию в файл субтитров SubRip (.srt)."""
 
     def export(
-        self, result_data: dict, destination_path: pathlib.Path, silent: bool = True
-    ):
+        self,
+        result_data: dict[str, Any],
+        destination_path: pathlib.Path,
+        silent: bool = True,
+    ) -> None:
         """Форматирует сегменты в SRT и сохраняет в файл."""
         srt_content = []
         segments = result_data.get("segments", [])
@@ -101,9 +117,37 @@ class SrtExportAdapter(ExportAdapter):
             destination_path.write_text("\n".join(srt_content), encoding="utf-8")
             if not silent:
                 console.print(
-                    f"💾 [green]Результат сохранен в:[/green]\n"
+                    f"{_SUCCESS_SAVE_MESSAGE}\n"
                     f"[bold cyan]{destination_path}[/bold cyan]"
                 )
+        except IOError as e:
+            console.print(f"[bold red]❌ Ошибка при сохранении файла: {e}[/bold red]")
+
+
+class DocxExportAdapter(ExportAdapter):
+    """Сохраняет транскрипцию в файл Microsoft Word (.docx)."""
+
+    def export(
+        self,
+        result_data: dict[str, Any],
+        destination_path: pathlib.Path,
+        silent: bool = True,
+    ) -> None:
+        """Создает .docx файл и сохраняет в него текст."""
+        try:
+            import docx
+
+            document = docx.Document()
+            document.add_paragraph(result_data["text"])
+            document.save(str(destination_path))
+            if not silent:
+                console.print(_SUCCESS_SAVE_MESSAGE)
+                console.print(f"[bold cyan]{destination_path}[/bold cyan]")
+        except ImportError as e:
+            msg = "Для экспорта в .docx требуется библиотека 'python-docx'."
+            console.print(f"[bold red]❌ Ошибка: {msg}[/bold red]")
+            # В GUI это исключение будет перехвачено и показано пользователю
+            raise ValueError(msg) from e
         except IOError as e:
             console.print(f"[bold red]❌ Ошибка при сохранении файла: {e}[/bold red]")
 
@@ -113,6 +157,7 @@ _EXPORTERS: Dict[OutputFormat, Type[ExportAdapter]] = {
     OutputFormat.TXT: TxtExportAdapter,
     OutputFormat.MD: MdExportAdapter,
     OutputFormat.SRT: SrtExportAdapter,
+    OutputFormat.DOCX: DocxExportAdapter,
 }
 
 

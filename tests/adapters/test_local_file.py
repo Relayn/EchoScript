@@ -4,6 +4,7 @@
 
 import os
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,7 +14,7 @@ from app.adapters.youtube import FFmpegNotFoundError
 
 
 @patch("shutil.which", return_value="/fake/path/to/ffmpeg")
-def test_process_file_success(mock_which, tmp_path):
+def test_process_file_success(mock_which: MagicMock, tmp_path: Path) -> None:
     """
     Тест: Успешная конвертация локального файла.
     """
@@ -41,7 +42,7 @@ def test_process_file_success(mock_which, tmp_path):
     adapter.cleanup()
 
 
-def test_adapter_raises_error_if_ffmpeg_not_found():
+def test_adapter_raises_error_if_ffmpeg_not_found() -> None:
     """
     Тест: Конструктор вызывает FFmpegNotFoundError, если ffmpeg не найден.
     """
@@ -51,7 +52,9 @@ def test_adapter_raises_error_if_ffmpeg_not_found():
 
 
 @patch("shutil.which", return_value="/fake/path/to/ffmpeg")
-def test_process_file_raises_error_on_ffmpeg_failure(mock_which, tmp_path):
+def test_process_file_raises_error_on_ffmpeg_failure(
+    mock_which: MagicMock, tmp_path: Path
+) -> None:
     """
     Тест: process_file вызывает IOError, если ffmpeg завершается с ошибкой.
     """

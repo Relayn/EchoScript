@@ -3,7 +3,7 @@
 """
 
 import threading
-from typing import Callable, Optional
+from typing import Any, Callable, Generator, Optional
 
 import numpy as np
 import soundfile as sf
@@ -31,7 +31,7 @@ class TranscriptionService:
         task: TranscriptionTask,
         cancel_event: threading.Event,
         progress_callback: Optional[Callable[[int, int], None]] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Транскрибирует аудио из указанного источника, обрабатывая его по частям.
 
@@ -52,7 +52,7 @@ class TranscriptionService:
                 num_chunks = int(np.ceil(total_frames / chunk_size_frames))
 
                 all_segments = []
-                options = {
+                options: dict[str, Any] = {
                     "language": language,
                     "verbose": True,
                     "task": task.value,
@@ -90,7 +90,9 @@ class TranscriptionService:
             )
             return {"text": "", "segments": []}
 
-    def _read_chunks(self, audio_file: sf.SoundFile, chunk_size_frames: int):
+    def _read_chunks(
+        self, audio_file: sf.SoundFile, chunk_size_frames: int
+    ) -> Generator[np.ndarray, None, None]:
         """Генератор, который читает аудиофайл по частям."""
         while True:
             data = audio_file.read(chunk_size_frames)

@@ -19,6 +19,7 @@ openai-whisper = "^20250625"
 yt-dlp = "^2025.7.21"
 sounddevice = "^0.5.2"
 tkinterdnd2 = "^0.4.3"
+python-docx = "^1.1.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
@@ -27,6 +28,13 @@ black = "^25.1.0"
 pyinstaller = "^6.15.0"
 pytest-cov = "^6.2.1"
 pre-commit = "^4.2.0"
+mypy = "^1.17.1"
+bandit = "^1.8.6"
+babel = "^2.15.0"
+types-requests = "^2.32.0.20240712"
+types-pyyaml = "^6.0.12.20240311"
+types-setuptools = "^72.0.0.20240723"
+
 
 [tool.poetry.group.gui.dependencies]
 customtkinter = "^5.2.2"
@@ -48,6 +56,32 @@ ignore = ["B008", "C901"] # Временно игнорируем сложнос
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+strict = true
+
+[[tool.mypy.overrides]]
+module = [
+    "whisper.*",
+    "sounddevice",
+    "tkinterdnd2",
+    "customtkinter",
+    "customtkinter.*",
+    "yt_dlp.*",
+    "soundfile",
+    "docx",
+    "rich.*",
+    "typer",
+    "typer.*"
+]
+ignore_missing_imports = true
+
 
 [[tool.poetry.source]]
 name = "pytorch_cuda"

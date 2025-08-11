@@ -3,10 +3,12 @@
 """
 
 import pathlib
+from typing import Any
 
 import pytest
 
 from app.adapters.export import (
+    DocxExportAdapter,
     MdExportAdapter,
     SrtExportAdapter,
     TxtExportAdapter,
@@ -15,7 +17,7 @@ from app.adapters.export import (
 from app.core.models import OutputFormat
 
 
-def test_txt_export_adapter_saves_file(tmp_path: pathlib.Path):
+def test_txt_export_adapter_saves_file(tmp_path: pathlib.Path) -> None:
     """
     Проверяет, что TxtExportAdapter корректно сохраняет текстовый файл.
     """
@@ -29,7 +31,7 @@ def test_txt_export_adapter_saves_file(tmp_path: pathlib.Path):
     assert destination_file.read_text(encoding="utf-8") == "Hello, world!"
 
 
-def test_md_export_adapter_saves_file(tmp_path: pathlib.Path):
+def test_md_export_adapter_saves_file(tmp_path: pathlib.Path) -> None:
     """
     Проверяет, что MdExportAdapter корректно сохраняет markdown файл.
     """
@@ -45,12 +47,12 @@ def test_md_export_adapter_saves_file(tmp_path: pathlib.Path):
     )
 
 
-def test_srt_export_adapter_saves_file(tmp_path: pathlib.Path):
+def test_srt_export_adapter_saves_file(tmp_path: pathlib.Path) -> None:
     """
     Проверяет, что SrtExportAdapter корректно сохраняет SRT файл.
     """
     adapter = SrtExportAdapter()
-    result_data = {
+    result_data: dict[str, Any] = {
         "text": "First line. Second line.",
         "segments": [
             {"start": 0.0, "end": 2.5, "text": "First line."},
@@ -66,24 +68,52 @@ def test_srt_export_adapter_saves_file(tmp_path: pathlib.Path):
     assert "2\n00:00:03,100 --> 00:00:05,800\nSecond line.\n" in content
 
 
-def test_get_exporter_returns_correct_adapter():
+def test_docx_export_adapter_saves_file(tmp_path: pathlib.Path) -> None:
+    """
+    Проверяет, что DocxExportAdapter корректно сохраняет .docx файл.
+    """
+    # Arrange
+    try:
+        import docx
+    except ImportError:
+        pytest.skip("python-docx не установлен, пропускаем тест")
+
+    adapter = DocxExportAdapter()
+    test_text = "Это текст для документа Word."
+    result_data = {"text": test_text}
+    destination_file = tmp_path / "output.docx"
+
+    # Act
+    adapter.export(result_data=result_data, destination_path=destination_file)
+
+    # Assert
+    assert destination_file.exists()
+    # Проверяем содержимое, открыв созданный файл
+    doc = docx.Document(str(destination_file))
+    assert len(doc.paragraphs) > 0
+    assert doc.paragraphs[0].text == test_text
+
+
+def test_get_exporter_returns_correct_adapter() -> None:
     """
     Проверяет, что фабрика get_exporter возвращает правильные экземпляры адаптеров.
     """
     txt_adapter = get_exporter(OutputFormat.TXT)
     md_adapter = get_exporter(OutputFormat.MD)
     srt_adapter = get_exporter(OutputFormat.SRT)
+    docx_adapter = get_exporter(OutputFormat.DOCX)
 
     assert isinstance(txt_adapter, TxtExportAdapter)
     assert isinstance(md_adapter, MdExportAdapter)
     assert isinstance(srt_adapter, SrtExportAdapter)
+    assert isinstance(docx_adapter, DocxExportAdapter)
 
 
-def test_get_exporter_raises_error_for_unknown_format():
+def test_get_exporter_raises_error_for_unknown_format() -> None:
     """
     Проверяет, что get_exporter вызывает ValueError для неизвестного формата.
     """
     with pytest.raises(
         ValueError, match="Не найден адаптер для формата 'invalid_format'"
     ):
-        get_exporter("invalid_format")
+        get_exporter("invalid_format")  # type: ignore[arg-type]

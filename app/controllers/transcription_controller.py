@@ -7,7 +7,7 @@ import pathlib
 import queue
 import threading
 from tkinter import messagebox
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from customtkinter import filedialog
 from pydantic import BaseModel
@@ -36,21 +36,21 @@ class TranscriptionController:
     """
 
     def __init__(self, view: "App"):
-        self.view = view
-        self.task_queue = queue.Queue()
-        self.is_running = False
-        self.is_recording = False
-        self.last_transcription_result: Optional[dict] = None
+        self.view: "App" = view
+        self.task_queue: queue.Queue[QueueMessage] = queue.Queue()
+        self.is_running: bool = False
+        self.is_recording: bool = False
+        self.last_transcription_result: Optional[dict[str, Any]] = None
         self.last_timestamps_enabled: bool = False
         self.cancel_event: Optional[threading.Event] = None
         self.realtime_service: Optional[RealtimeTranscriptionService] = None
         self.realtime_full_text: str = ""
 
-    def _log_to_queue(self, message: str):
+    def _log_to_queue(self, message: str) -> None:
         """Отправляет статусное сообщение в очередь GUI."""
         self.task_queue.put(QueueMessage(status=message))
 
-    def select_file(self):
+    def select_file(self) -> None:
         if self.is_running:
             return
         file_path = filedialog.askopenfilename(
@@ -62,7 +62,7 @@ class TranscriptionController:
         )
         self.handle_source_path(file_path)
 
-    def handle_source_path(self, file_path: str):
+    def handle_source_path(self, file_path: str) -> None:
         if not file_path or self.is_running:
             return
         self.view.file_path_entry.configure(state="normal")
@@ -71,7 +71,7 @@ class TranscriptionController:
         self.view.file_path_entry.configure(state="disabled")
         self.view.youtube_entry.delete(0, "end")
 
-    def on_youtube_entry_change(self, _, __, ___):
+    def on_youtube_entry_change(self, *_: Any) -> None:
         if self.is_running:
             return
         if self.view.youtube_entry.get():
@@ -79,7 +79,7 @@ class TranscriptionController:
             self.view.file_path_entry.delete(0, "end")
             self.view.file_path_entry.configure(state="disabled")
 
-    def start_transcription(self):
+    def start_transcription(self) -> None:
         if self.is_running:
             return
 
@@ -104,7 +104,7 @@ class TranscriptionController:
             else TranscriptionTask.TRANSCRIBE
         )
 
-        params = {
+        params: dict[str, Any] = {
             "source": source_file or source_url,
             "is_youtube": bool(source_url),
             "model_size": ModelSize(self.view.model_menu.get()),
@@ -116,12 +116,12 @@ class TranscriptionController:
         thread.daemon = True
         thread.start()
 
-    def cancel_transcription(self):
+    def cancel_transcription(self) -> None:
         if self.cancel_event:
             self._log_to_queue("Отмена операции...")
             self.cancel_event.set()
 
-    def save_result(self):
+    def save_result(self) -> None:
         if not self.last_transcription_result or not self.last_transcription_result.get(
             "text"
         ):
@@ -140,6 +140,7 @@ class TranscriptionController:
 
         file_extension = f".{output_format.value}"
         file_types = [
+            ("Word Документ", "*.docx"),
             ("Текстовые файлы", "*.txt"),
             ("Markdown файлы", "*.md"),
             ("SRT субтитры", "*.srt"),
@@ -165,16 +166,16 @@ class TranscriptionController:
         except Exception as e:
             self._log_to_queue(f"Ошибка при сохранении файла: {e}")
 
-    def _log_to_status_bar(self, message: str):
+    def _log_to_status_bar(self, message: str) -> None:
         """Отправляет только статусное сообщение в очередь GUI."""
         self.task_queue.put(QueueMessage(status=message))
 
-    def _on_realtime_result(self, partial_text: str):
+    def _on_realtime_result(self, partial_text: str) -> None:
         """Callback для получения частичного результата от Realtime сервиса."""
         self.realtime_full_text += partial_text + " "
         self.task_queue.put(QueueMessage(partial_result=partial_text + " "))
 
-    def toggle_realtime_transcription(self):
+    def toggle_realtime_transcription(self) -> None:
         """Переключает состояние записи с микрофона."""
         if self.is_recording:
             if self.realtime_service:
@@ -202,7 +203,7 @@ class TranscriptionController:
                 self.view.update_ui_for_recording_end()
                 return
 
-            params = {
+            params: dict[str, Any] = {
                 "model_size": ModelSize(self.view.model_menu.get()),
                 "task": task,
                 "mic_id": mic_id,
@@ -213,7 +214,7 @@ class TranscriptionController:
             thread.daemon = True
             thread.start()
 
-    def _realtime_worker_start(self, params: dict):
+    def _realtime_worker_start(self, params: dict[str, Any]) -> None:
         """Загружает модель и запускает сервис записи в фоновом потоке."""
         import whisper
 
@@ -244,10 +245,10 @@ class TranscriptionController:
             # Отправляем сообщение в основной поток для обновления GUI
             self.task_queue.put(QueueMessage(is_done=True))
 
-    def _transcription_worker(self, params: dict):
+    def _transcription_worker(self, params: dict[str, Any]) -> None:
         from app.adapters.youtube import FFmpegNotFoundError
 
-        adapters = {"youtube": None, "local": None}
+        adapters: dict[str, Any] = {"youtube": None, "local": None}
         try:
             processed_path = self._process_source(params, adapters)
             if not processed_path:
@@ -278,9 +279,17 @@ class TranscriptionController:
             self.is_running = False
             self.cancel_event = None
 
-    def _format_result_for_gui(self, result_data: dict) -> str:
+    def _format_result_for_gui(self, result_data: dict[str, Any]) -> str:
         if not self.last_timestamps_enabled:
-            return result_data.get("text", "")
+            text_result = result_data.get("text", "")
+            # Явная проверка типа, которая удовлетворяет и mypy, и bandit
+            if not isinstance(text_result, str):
+                # Эта ситуация не должна произойти, но это надежная защита
+                self._log_to_queue(
+                    f"Критическая ошибка: ожидался текст, получен {type(text_result)}"
+                )
+                return ""
+            return text_result
 
         text_parts = []
         for segment in result_data.get("segments", []):
@@ -295,29 +304,35 @@ class TranscriptionController:
 
         return "\n".join(text_parts)
 
-    def _process_source(self, params: dict, adapters: dict) -> str:
+    def _process_source(self, params: dict[str, Any], adapters: dict[str, Any]) -> str:
         """Обрабатывает источник (файл или URL) и возвращает путь к WAV файлу."""
         from app.adapters.local_file import LocalFileAdapter
         from app.adapters.youtube import YoutubeAdapter
 
-        audio_path = params["source"]
+        audio_path: str = params["source"]
+        processed_path: Optional[str] = None
 
         if params["is_youtube"]:
             self._log_to_queue("Загрузка с YouTube...")
-            adapter = YoutubeAdapter()
-            adapters["youtube"] = adapter
-            return adapter.download_audio(
+            youtube_adapter = YoutubeAdapter()
+            adapters["youtube"] = youtube_adapter
+            processed_path = youtube_adapter.download_audio(
                 url=audio_path, log_callback=self._log_to_queue
             )
         else:
             self._log_to_queue("Обработка локального файла...")
-            adapter = LocalFileAdapter()
-            adapters["local"] = adapter
-            return adapter.process_file(
+            local_file_adapter = LocalFileAdapter()
+            adapters["local"] = local_file_adapter
+            processed_path = local_file_adapter.process_file(
                 source_path=audio_path, log_callback=self._log_to_queue
             )
+        if not processed_path:
+            raise IOError("Адаптер не вернул путь к обработанному файлу.")
+        return processed_path
 
-    def _execute_transcription(self, audio_path: str, params: dict) -> dict:
+    def _execute_transcription(
+        self, audio_path: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
         import whisper
 
         from app.services.model_manager import ModelManager
@@ -325,7 +340,7 @@ class TranscriptionController:
 
         self.task_queue.put(QueueMessage(progress=0.2))
 
-        def model_progress_callback(downloaded_bytes, total_bytes):
+        def model_progress_callback(downloaded_bytes: int, total_bytes: int) -> None:
             if total_bytes > 0:
                 progress = 0.2 + (downloaded_bytes / total_bytes) * 0.1
                 self.task_queue.put(QueueMessage(progress=progress))
@@ -347,7 +362,9 @@ class TranscriptionController:
         self._log_to_queue("Подготовка к транскрибации...")
         self.task_queue.put(QueueMessage(progress=0.35))
 
-        def transcription_progress_callback(processed_chunks, total_chunks):
+        def transcription_progress_callback(
+            processed_chunks: int, total_chunks: int
+        ) -> None:
             if total_chunks > 0:
                 progress = 0.35 + (processed_chunks / total_chunks) * 0.65
                 self.task_queue.put(QueueMessage(progress=progress))
@@ -365,7 +382,7 @@ class TranscriptionController:
             progress_callback=transcription_progress_callback,
         )
 
-    def _cleanup_resources(self, adapters: dict):
+    def _cleanup_resources(self, adapters: dict[str, Any]) -> None:
         for adapter_name, adapter_instance in adapters.items():
             if adapter_instance:
                 try:

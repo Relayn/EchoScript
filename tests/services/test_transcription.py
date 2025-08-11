@@ -3,6 +3,7 @@
 """
 
 import threading
+from typing import Any
 from unittest.mock import MagicMock, call, patch
 
 import numpy as np
@@ -30,7 +31,7 @@ def mock_whisper_model() -> MagicMock:
 
 
 @pytest.fixture
-def mock_sound_file():
+def mock_sound_file() -> Any:
     """Фикстура, создающая мок для soundfile.SoundFile."""
     fake_samplerate = 16000
     total_duration_seconds = int(CHUNK_DURATION_SECONDS * 1.5)
@@ -53,8 +54,8 @@ def mock_sound_file():
 
 
 def test_transcribe_returns_dict_with_text_and_segments(
-    mock_whisper_model, mock_sound_file
-):
+    mock_whisper_model: MagicMock, mock_sound_file: Any
+) -> None:
     """Тест: transcribe корректно возвращает словарь с текстом и сегментами."""
     service = TranscriptionService(model=mock_whisper_model)
     cancel_event = threading.Event()
@@ -72,7 +73,9 @@ def test_transcribe_returns_dict_with_text_and_segments(
     assert result["segments"][0]["text"] == " Это первая часть. "
 
 
-def test_transcribe_with_progress_callback(mock_whisper_model, mock_sound_file):
+def test_transcribe_with_progress_callback(
+    mock_whisper_model: MagicMock, mock_sound_file: Any
+) -> None:
     """Тест: progress_callback вызывается с правильными аргументами."""
     # Arrange
     service = TranscriptionService(model=mock_whisper_model)

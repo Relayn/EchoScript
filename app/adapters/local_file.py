@@ -5,7 +5,7 @@
 import os
 import pathlib
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import tempfile
 from typing import Callable, Optional
 
@@ -19,9 +19,9 @@ class LocalFileAdapter:
     формат WAV с помощью ffmpeg для дальнейшей обработки.
     """
 
-    def __init__(self):
-        self._temp_dir = tempfile.mkdtemp(prefix="echoscript_local_")
-        self.ffmpeg_path = find_ffmpeg_path()
+    def __init__(self) -> None:
+        self._temp_dir: str = tempfile.mkdtemp(prefix="echoscript_local_")
+        self.ffmpeg_path: Optional[str] = find_ffmpeg_path()
         if not self.ffmpeg_path:
             raise FFmpegNotFoundError(
                 "Для обработки локальных файлов необходим ffmpeg, но он не найден."
@@ -39,6 +39,10 @@ class LocalFileAdapter:
         output_filename = f"{source_path_obj.stem}.wav"
         output_path = os.path.join(self._temp_dir, output_filename)
 
+        if not self.ffmpeg_path:
+            # Эта проверка нужна для mypy, хотя конструктор уже делает это.
+            raise FFmpegNotFoundError("Путь к ffmpeg не определен.")
+
         command = [
             self.ffmpeg_path,
             "-i",
@@ -55,7 +59,7 @@ class LocalFileAdapter:
         ]
 
         try:
-            subprocess.run(
+            subprocess.run(  # nosec B603
                 command, check=True, capture_output=True, text=True, encoding="utf-8"
             )
             if log_callback:
@@ -74,7 +78,7 @@ class LocalFileAdapter:
                 log_callback(f"Непредвиденная ошибка в LocalFileAdapter: {e}")
             raise
 
-    def cleanup(self, log_callback: Optional[Callable[[str], None]] = None):
+    def cleanup(self, log_callback: Optional[Callable[[str], None]] = None) -> None:
         """Удаляет временную директорию и все ее содержимое."""
         if os.path.exists(self._temp_dir):
             try:

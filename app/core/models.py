@@ -22,6 +22,7 @@ class OutputFormat(str, enum.Enum):
     TXT = "txt"
     MD = "md"
     SRT = "srt"
+    DOCX = "docx"
 
 
 # Типовая подсказка, представляющая валидный источник:

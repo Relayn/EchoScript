@@ -8,7 +8,7 @@ from unittest.mock import patch
 from app.core.utils import find_ffmpeg_path
 
 
-def test_find_ffmpeg_path_dev_mode():
+def test_find_ffmpeg_path_dev_mode() -> None:
     """Тест: в режиме разработки (не frozen) используется shutil.which."""
     # create=True нужно, чтобы можно было патчить несуществующий атрибут
     with (
@@ -19,7 +19,7 @@ def test_find_ffmpeg_path_dev_mode():
         mock_which.assert_called_once_with("ffmpeg")
 
 
-def test_find_ffmpeg_path_frozen_mode_found():
+def test_find_ffmpeg_path_frozen_mode_found() -> None:
     """Тест: в frozen-режиме путь к ffmpeg успешно находится внутри пакета."""
     executable_path = "/path/to/app/gui_main.exe"
     expected_path = os.path.join(
@@ -37,7 +37,7 @@ def test_find_ffmpeg_path_frozen_mode_found():
         mock_which.assert_not_called()  # shutil.which не должен вызываться
 
 
-def test_find_ffmpeg_path_frozen_mode_fallback():
+def test_find_ffmpeg_path_frozen_mode_fallback() -> None:
     """Тест: в frozen-режиме, если ffmpeg не найден, используется fallback."""
     executable_path = "/path/to/app/gui_main.exe"
 

@@ -6,6 +6,7 @@
 import importlib.metadata
 import pathlib
 import threading
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -62,8 +63,8 @@ def pre_flight_check(source: str) -> bool:
     return True
 
 
-@app.command()
-def version():
+@app.command()  # type: ignore[misc]
+def version() -> None:
     """Показывает версию приложения."""
     version_str = importlib.metadata.version("echoscript")
     console.print(f"EchoScript v[bold green]{version_str}[/bold green]")
@@ -72,11 +73,11 @@ def version():
 def _run_transcription(
     source: str,
     model_size: ModelSize,
-    output_dir: pathlib.Path | None,
+    output_dir: Optional[pathlib.Path],
     output_format: OutputFormat,
-    language: str | None,
+    language: Optional[str],
     task: TranscriptionTask,
-):
+) -> None:
     """Основная логика транскрибации, вынесенная из команды Typer."""
     from rich.progress import (
         BarColumn,
@@ -106,10 +107,10 @@ def _run_transcription(
         transient=True,
     )
 
-    def download_callback(downloaded, total):
+    def download_callback(downloaded: int, total: int) -> None:
         if not download_progress.tasks:
             download_progress.add_task("download", total=total)
-        download_progress.update(download_progress.tasks.id, completed=downloaded)
+        download_progress.update(download_progress.tasks[0].id, completed=downloaded)
 
     try:
         whisper_model = get_model(
@@ -123,19 +124,20 @@ def _run_transcription(
         )
         raise typer.Exit(code=1) from e
 
-    audio_path = source
-    youtube_adapter = None
+    audio_path: str = source
+    youtube_adapter: Optional[YoutubeAdapter] = None
 
     try:
         if source.startswith(("http", "https")):
             try:
                 youtube_adapter = YoutubeAdapter()
-                audio_path = youtube_adapter.download_audio(url=source)
-                if not audio_path:
+                downloaded_path = youtube_adapter.download_audio(url=source)
+                if not downloaded_path:
                     console.print(
                         "[bold red]Не удалось получить аудиофайл с YouTube.[/bold red]"
                     )
                     raise typer.Exit(code=1)
+                audio_path = downloaded_path
             except FFmpegNotFoundError as e:
                 console.print(f"[bold red]❌ Ошибка зависимости:[/bold red]\n{e}")
                 raise typer.Exit(code=1) from e
@@ -149,11 +151,11 @@ def _run_transcription(
             transient=True,
         )
 
-        def transcription_callback(processed, total):
+        def transcription_callback(processed: int, total: int) -> None:
             if not transcription_progress.tasks:
                 transcription_progress.add_task("transcribe", total=total)
             transcription_progress.update(
-                transcription_progress.tasks.id, completed=processed
+                transcription_progress.tasks[0].id, completed=processed
             )
 
         with transcription_progress:
@@ -185,7 +187,7 @@ def _run_transcription(
             youtube_adapter.cleanup()
 
 
-@app.command()
+@app.command()  # type: ignore[misc]
 def transcribe(
     source: Annotated[
         str, typer.Argument(help="Источник: путь к файлу или URL YouTube.")
@@ -200,7 +202,7 @@ def transcribe(
         ),
     ] = ModelSize.BASE,
     output_dir: Annotated[
-        pathlib.Path,
+        Optional[pathlib.Path],
         typer.Option(
             "--output-dir", "-o", help="Директория для сохранения результата."
         ),
@@ -212,7 +214,7 @@ def transcribe(
         ),
     ] = OutputFormat.TXT,
     language: Annotated[
-        str,
+        Optional[str],
         typer.Option("--lang", "-l", help="Язык аудио (определяется автоматически)."),
     ] = None,
     task: Annotated[
@@ -221,7 +223,7 @@ def transcribe(
             "--task", help="Задача: транскрибация или перевод.", case_sensitive=False
         ),
     ] = TranscriptionTask.TRANSCRIBE,
-):
+) -> None:
     """Запускает процесс транскрибации для указанного источника."""
     console.print(f"🚀 Запуск транскрибации для: [bold cyan]{source}[/bold cyan]")
 
