@@ -1,0 +1,267 @@
+# English translations for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-08-11 09:36+0000\n"
+"PO-Revision-Date: 2025-08-11 10:15+0000\n"
+"Last-Translator: AI-Mentor <mentor@example.com>\n"
+"Language-Team: English <en@li.org>\n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.15.0\n"
+
+#: app/controllers/transcription_controller.py:110
+msgid "Ошибка: Укажите источник (файл или URL)"
+msgstr "Error: Specify a source (file or URL)"
+
+#: app/controllers/transcription_controller.py:136
+msgid "Отмена операции..."
+msgstr "Cancelling operation..."
+
+#: app/controllers/transcription_controller.py:142
+msgid "Нечего сохранять."
+msgstr "Nothing to save."
+
+#: app/controllers/transcription_controller.py:149
+msgid "Ошибка сохранения"
+msgstr "Save Error"
+
+#: app/controllers/transcription_controller.py:151
+msgid ""
+"Для сохранения в формате .srt необходимо выполнить транскрибацию с "
+"включенной опцией 'Включить таймстемпы'."
+msgstr ""
+"To save in .srt format, transcription must be run with the 'Enable "
+"Timestamps' option."
+
+#: app/controllers/transcription_controller.py:159
+msgid "Word Документ"
+msgstr "Word Document"
+
+#: app/controllers/transcription_controller.py:160
+msgid "Текстовые файлы"
+msgstr "Text Files"
+
+#: app/controllers/transcription_controller.py:161
+msgid "Markdown файлы"
+msgstr "Markdown Files"
+
+#: app/controllers/transcription_controller.py:162
+msgid "SRT субтитры"
+msgstr "SRT Subtitles"
+
+#: app/controllers/transcription_controller.py:163
+msgid "Все файлы"
+msgstr "All Files"
+
+#: app/controllers/transcription_controller.py:166
+msgid "Сохранить результат"
+msgstr "Save Result"
+
+#: app/controllers/transcription_controller.py:176
+#, python-format
+msgid "Файл успешно сохранен: {}"
+msgstr "File saved successfully: {}"
+
+#: app/controllers/transcription_controller.py:178
+#, python-format
+msgid "Ошибка при сохранении файла: {}"
+msgstr "Error saving file: {}"
+
+#: app/controllers/transcription_controller.py:206
+msgid "Перевод"
+msgstr "Translate"
+
+#: app/controllers/transcription_controller.py:211
+msgid "Ошибка: Не удалось определить ID микрофона."
+msgstr "Error: Could not determine microphone ID."
+
+#: app/controllers/transcription_controller.py:233
+#, python-format
+msgid "Загрузка модели '{}' в память..."
+msgstr "Loading model '{}' into memory..."
+
+#: app/controllers/transcription_controller.py:246
+#, python-format
+msgid "Критическая ошибка при запуске записи: {}"
+msgstr "Critical error during recording startup: {}"
+
+#: app/controllers/transcription_controller.py:255
+msgid "Не удалось обработать исходный файл или URL."
+msgstr "Failed to process the source file or URL."
+
+#: app/controllers/transcription_controller.py:262
+msgid "Операция была отменена пользователем."
+msgstr "Operation was cancelled by the user."
+
+#: app/controllers/transcription_controller.py:266
+msgid "Готово!"
+msgstr "Done!"
+
+#: app/controllers/transcription_controller.py:270
+#, python-format
+msgid "Ошибка: {}"
+msgstr "Error: {}"
+
+#: app/controllers/transcription_controller.py:272
+#, python-format
+msgid "Критическая ошибка: {}"
+msgstr "Critical error: {}"
+
+#: app/controllers/transcription_controller.py:284
+#, python-format
+msgid "Критическая ошибка: ожидался текст, получен {}"
+msgstr "Critical error: expected text, got {}"
+
+#: app/controllers/transcription_controller.py:302
+msgid "Загрузка с YouTube..."
+msgstr "Downloading from YouTube..."
+
+#: app/controllers/transcription_controller.py:309
+msgid "Обработка локального файла..."
+msgstr "Processing local file..."
+
+#: app/controllers/transcription_controller.py:315
+msgid "Адаптер не вернул путь к обработанному файлу."
+msgstr "Adapter did not return a path to the processed file."
+
+#: app/controllers/transcription_controller.py:344
+msgid "Подготовка к транскрибации..."
+msgstr "Preparing for transcription..."
+
+#: app/controllers/transcription_controller.py:354
+#, python-format
+msgid "Транскрибация... ({}/{})"
+msgstr "Transcribing... ({}/{})"
+
+#: app/controllers/transcription_controller.py:369
+#, python-format
+msgid "Не удалось очистить временные файлы {}: {}"
+msgstr "Failed to clean up temporary files for {}: {}"
+
+#: app/controllers/transcription_controller.py:99
+msgid "Выберите медиафайл"
+msgstr "Select a media file"
+
+#: app/gui_main.py:32
+msgid "Из файла"
+msgstr "From File"
+
+#: app/gui_main.py:33
+msgid "С микрофона"
+msgstr "From Microphone"
+
+#: app/gui_main.py:42
+msgid "EchoScript - AI-Транскрибатор"
+msgstr "EchoScript - AI Transcriber"
+
+#: app/gui_main.py:109
+msgid "Выбрать файл"
+msgstr "Select File"
+
+#: app/gui_main.py:114
+msgid "Путь к файлу (или перетащите сюда)"
+msgstr "File path (or drag and drop here)"
+
+#: app/gui_main.py:120
+msgid "или"
+msgstr "or"
+
+#: app/gui_main.py:125
+msgid "URL видео с YouTube"
+msgstr "YouTube video URL"
+
+#: app/gui_main.py:135
+msgid "Микрофон:"
+msgstr "Microphone:"
+
+#: app/gui_main.py:141
+msgid "Микрофоны не найдены"
+msgstr "No microphones found"
+
+#: app/gui_main.py:145
+msgid "Начать запись"
+msgstr "Start Recording"
+
+#: app/gui_main.py:157
+#, python-format
+msgid "{} (ID: {})"
+msgstr "{} (ID: {})"
+
+#: app/gui_main.py:163
+#, python-format
+msgid "Ошибка аудио: {}"
+msgstr "Audio error: {}"
+
+#: app/gui_main.py:176
+msgid "Настройки"
+msgstr "Settings"
+
+#: app/gui_main.py:180
+msgid "Задача:"
+msgstr "Task:"
+
+#: app/gui_main.py:183
+msgid "Транскрибация"
+msgstr "Transcribe"
+
+#: app/gui_main.py:188
+msgid "Модель Whisper:"
+msgstr "Whisper Model:"
+
+#: app/gui_main.py:198
+msgid "Формат вывода:"
+msgstr "Output Format:"
+
+#: app/gui_main.py:205
+msgid "Включить таймстемпы"
+msgstr "Enable Timestamps"
+
+#: app/gui_main.py:209
+msgid "Старт"
+msgstr "Start"
+
+#: app/gui_main.py:213
+msgid "Сохранить результат"
+msgstr "Save Result"
+
+#: app/gui_main.py:226
+msgid "Готов к работе..."
+msgstr "Ready..."
+
+#: app/gui_main.py:234
+msgid "Требования к ресурсам"
+msgstr "Resource Requirements"
+
+#: app/gui_main.py:236
+msgid ""
+"Вы выбрали модель '{}'.\n"
+"\n"
+"Эта модель требует значительного объема видеопамяти (VRAM) для "
+"оптимальной работы (5-10 ГБ).\n"
+"\n"
+"Если у вас нет мощной видеокарты, обработка может быть очень медленной или "
+"привести к ошибкам нехватки памяти."
+msgstr ""
+"You have selected the '{}' model.\n"
+"\n"
+"This model requires a significant amount of VRAM (5-10 GB) for optimal "
+"performance.\n"
+"\n"
+"If you do not have a powerful graphics card, processing may be very slow or "
+"result in out-of-memory errors."
+
+#: app/gui_main.py:280
+msgid "Отмена"
+msgstr "Cancel"
+
+#: app/gui_main.py:307
+msgid "Остановить запись"
+msgstr "Stop Recording"

@@ -14,6 +14,7 @@ from app.controllers.transcription_controller import (
     QueueMessage,
     TranscriptionController,
 )
+from app.core.localization import _
 from app.core.models import ModelSize, TranscriptionTask
 from app.services.realtime_transcription import RealtimeTranscriptionService
 
@@ -81,7 +82,7 @@ def test_start_transcription_starts_thread(
     """Тест: успешный запуск транскрипции создает и запускает фоновый поток."""
     mock_view.file_path_entry.get.return_value = "/fake/file.mp3"
     mock_view.model_menu.get.return_value = "tiny"
-    mock_view.task_segmented_button.get.return_value = "Транскрибация"
+    mock_view.task_segmented_button.get.return_value = _("Транскрибация")
     controller.start_transcription()
     mock_thread.assert_called_once()
 
@@ -92,7 +93,8 @@ def test_start_transcription_no_source(controller: TranscriptionController) -> N
     controller.view.youtube_entry.get.return_value = ""
     controller.start_transcription()
     messages = _drain_queue(controller.task_queue)
-    assert any("Укажите источник" in msg.status for msg in messages if msg.status)
+    expected_error = _("Ошибка: Укажите источник (файл или URL)")
+    assert any(msg.status == expected_error for msg in messages if msg.status)
 
 
 def test_save_result_no_result(controller: TranscriptionController) -> None:
@@ -100,7 +102,7 @@ def test_save_result_no_result(controller: TranscriptionController) -> None:
     controller.last_transcription_result = None
     controller.save_result()
     msg = controller.task_queue.get(timeout=1)
-    assert msg.status == "Нечего сохранять."
+    assert msg.status == _("Нечего сохранять.")
 
 
 @patch("app.controllers.transcription_controller.messagebox.showerror")
@@ -145,7 +147,7 @@ def test_worker_success_flow(
     controller._transcription_worker(params)
 
     messages = _drain_queue(controller.task_queue)
-    final_status_msg = next(msg for msg in messages if msg.status == "Готово!")
+    final_status_msg = next(msg for msg in messages if msg.status == _("Готово!"))
     assert final_status_msg.result_text == "ok"
     assert any(msg.is_done for msg in messages)
 
@@ -158,9 +160,8 @@ def test_worker_known_error_flow(controller: TranscriptionController) -> None:
         controller._transcription_worker(params)
 
     messages = _drain_queue(controller.task_queue)
-    assert any(
-        "Ошибка: ffmpeg not found" in msg.status for msg in messages if msg.status
-    )
+    expected_error = _("Ошибка: {}").format("ffmpeg not found")
+    assert any(msg.status == expected_error for msg in messages if msg.status)
     assert any(msg.is_done for msg in messages)
 
 
@@ -172,11 +173,8 @@ def test_worker_critical_error_flow(controller: TranscriptionController) -> None
         controller._transcription_worker(params)
 
     messages = _drain_queue(controller.task_queue)
-    assert any(
-        "Критическая ошибка: Something went very wrong" in msg.status
-        for msg in messages
-        if msg.status
-    )
+    expected_error = _("Критическая ошибка: {}").format("Something went very wrong")
+    assert any(msg.status == expected_error for msg in messages if msg.status)
     assert any(msg.is_done for msg in messages)
 
 
@@ -210,11 +208,10 @@ def test_cleanup_resources_handles_exception(
     controller._cleanup_resources(adapters)
 
     messages = _drain_queue(controller.task_queue)
-    assert any(
-        "Не удалось очистить временные файлы" in msg.status
-        for msg in messages
-        if msg.status
+    expected_error = _("Не удалось очистить временные файлы {}: {}").format(
+        "youtube", "Cleanup failed"
     )
+    assert any(msg.status == expected_error for msg in messages if msg.status)
 
 
 # --- Тесты для Real-time транскрипции ---
@@ -227,7 +224,7 @@ def test_toggle_realtime_transcription_starts_recording(
     """Тест: toggle_realtime_transcription успешно запускает запись."""
     # Arrange
     controller.is_recording = False
-    mock_view.task_segmented_button.get.return_value = "Транскрибация"
+    mock_view.task_segmented_button.get.return_value = _("Транскрибация")
     mock_view.mic_menu.get.return_value = "Fake Mic (ID: 1)"
     mock_view.model_menu.get.return_value = "tiny"
 
@@ -309,5 +306,8 @@ def test_realtime_worker_start_handles_exception(
     # Assert
     assert controller.is_recording is False
     messages = _drain_queue(controller.task_queue)
-    assert any("Критическая ошибка" in msg.status for msg in messages if msg.status)
+    expected_error = _("Критическая ошибка при запуске записи: {}").format(
+        "Model load failed"
+    )
+    assert any(msg.status == expected_error for msg in messages if msg.status)
     assert any(msg.is_done for msg in messages)

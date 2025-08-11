@@ -13,6 +13,7 @@ from customtkinter import filedialog
 from pydantic import BaseModel
 
 from app.adapters.export import get_exporter
+from app.core.localization import _
 from app.core.models import ModelSize, OutputFormat, TranscriptionTask
 from app.services.realtime_transcription import RealtimeTranscriptionService
 
@@ -54,10 +55,10 @@ class TranscriptionController:
         if self.is_running:
             return
         file_path = filedialog.askopenfilename(
-            title="Выберите медиафайл",
+            title=_("Выберите медиафайл"),
             filetypes=(
-                ("Медиафайлы", "*.mp3 *.wav *.m4a *.mp4 *.mov"),
-                ("Все файлы", "*.*"),
+                (_("Медиафайлы"), "*.mp3 *.wav *.m4a *.mp4 *.mov"),
+                (_("Все файлы"), "*.*"),
             ),
         )
         self.handle_source_path(file_path)
@@ -87,7 +88,7 @@ class TranscriptionController:
         source_url = self.view.youtube_entry.get()
 
         if not source_file and not source_url:
-            self._log_to_queue("Ошибка: Укажите источник (файл или URL)")
+            self._log_to_queue(_("Ошибка: Укажите источник (файл или URL)"))
             self.task_queue.put(QueueMessage(is_done=True))
             return
 
@@ -100,7 +101,7 @@ class TranscriptionController:
         selected_task_str = self.view.task_segmented_button.get()
         task = (
             TranscriptionTask.TRANSLATE
-            if selected_task_str == "Перевод"
+            if selected_task_str == _("Перевод")
             else TranscriptionTask.TRANSCRIBE
         )
 
@@ -118,37 +119,39 @@ class TranscriptionController:
 
     def cancel_transcription(self) -> None:
         if self.cancel_event:
-            self._log_to_queue("Отмена операции...")
+            self._log_to_queue(_("Отмена операции..."))
             self.cancel_event.set()
 
     def save_result(self) -> None:
         if not self.last_transcription_result or not self.last_transcription_result.get(
             "text"
         ):
-            self._log_to_queue("Нечего сохранять.")
+            self._log_to_queue(_("Нечего сохранять."))
             return
 
         output_format = OutputFormat(self.view.format_menu.get())
 
         if output_format == OutputFormat.SRT and not self.last_timestamps_enabled:
             messagebox.showerror(
-                "Ошибка сохранения",
-                "Для сохранения в формате .srt необходимо выполнить транскрибацию "
-                "с включенной опцией 'Включить таймстемпы'.",
+                _("Ошибка сохранения"),
+                _(
+                    "Для сохранения в формате .srt необходимо выполнить транскрибацию "
+                    "с включенной опцией 'Включить таймстемпы'."
+                ),
             )
             return
 
         file_extension = f".{output_format.value}"
         file_types = [
-            ("Word Документ", "*.docx"),
-            ("Текстовые файлы", "*.txt"),
-            ("Markdown файлы", "*.md"),
-            ("SRT субтитры", "*.srt"),
-            ("Все файлы", "*.*"),
+            (_("Word Документ"), "*.docx"),
+            (_("Текстовые файлы"), "*.txt"),
+            (_("Markdown файлы"), "*.md"),
+            (_("SRT субтитры"), "*.srt"),
+            (_("Все файлы"), "*.*"),
         ]
 
         file_path = filedialog.asksaveasfilename(
-            title="Сохранить результат",
+            title=_("Сохранить результат"),
             defaultextension=file_extension,
             filetypes=file_types,
         )
@@ -162,9 +165,9 @@ class TranscriptionController:
                 result_data=self.last_transcription_result,
                 destination_path=pathlib.Path(file_path),
             )
-            self._log_to_queue(f"Файл успешно сохранен: {file_path}")
+            self._log_to_queue(_("Файл успешно сохранен: {}").format(file_path))
         except Exception as e:
-            self._log_to_queue(f"Ошибка при сохранении файла: {e}")
+            self._log_to_queue(_("Ошибка при сохранении файла: {}").format(e))
 
     def _log_to_status_bar(self, message: str) -> None:
         """Отправляет только статусное сообщение в очередь GUI."""
@@ -191,14 +194,16 @@ class TranscriptionController:
             selected_task_str = self.view.task_segmented_button.get()
             task = (
                 TranscriptionTask.TRANSLATE
-                if selected_task_str == "Перевод"
+                if selected_task_str == _("Перевод")
                 else TranscriptionTask.TRANSCRIBE
             )
             mic_id_str = self.view.mic_menu.get()
             try:
                 mic_id = int(mic_id_str.split("ID: ")[1].strip(")"))
             except (IndexError, ValueError):
-                self._log_to_status_bar("Ошибка: Не удалось определить ID микрофона.")
+                self._log_to_status_bar(
+                    _("Ошибка: Не удалось определить ID микрофона.")
+                )
                 self.is_recording = False
                 self.view.update_ui_for_recording_end()
                 return
@@ -226,7 +231,7 @@ class TranscriptionController:
                 log_callback=self._log_to_status_bar
             )
             self._log_to_status_bar(
-                f"Загрузка модели '{params['model_size'].value}' в память..."
+                _("Загрузка модели '{}' в память...").format(params["model_size"].value)
             )
             model = whisper.load_model(model_path)
 
@@ -240,7 +245,9 @@ class TranscriptionController:
             self.realtime_service.start()
 
         except Exception as e:
-            self._log_to_status_bar(f"Критическая ошибка при запуске записи: {e}")
+            self._log_to_status_bar(
+                _("Критическая ошибка при запуске записи: {}").format(e)
+            )
             self.is_recording = False
             # Отправляем сообщение в основной поток для обновления GUI
             self.task_queue.put(QueueMessage(is_done=True))
@@ -252,7 +259,7 @@ class TranscriptionController:
         try:
             processed_path = self._process_source(params, adapters)
             if not processed_path:
-                raise IOError("Не удалось обработать исходный файл или URL.")
+                raise IOError(_("Не удалось обработать исходный файл или URL."))
 
             if params["cancel_event"].is_set():
                 return
@@ -261,18 +268,18 @@ class TranscriptionController:
             self.last_transcription_result = result_data
 
             if params["cancel_event"].is_set():
-                result_text = "Операция была отменена пользователем."
+                result_text = _("Операция была отменена пользователем.")
             else:
                 result_text = self._format_result_for_gui(result_data)
 
             self.task_queue.put(
-                QueueMessage(status="Готово!", progress=1.0, result_text=result_text)
+                QueueMessage(status=_("Готово!"), progress=1.0, result_text=result_text)
             )
 
         except (FFmpegNotFoundError, IOError) as e:
-            self._log_to_queue(f"Ошибка: {e}")
+            self._log_to_queue(_("Ошибка: {}").format(e))
         except Exception as e:
-            self._log_to_queue(f"Критическая ошибка: {e}")
+            self._log_to_queue(_("Критическая ошибка: {}").format(e))
         finally:
             self._cleanup_resources(adapters)
             self.task_queue.put(QueueMessage(is_done=True))
@@ -286,7 +293,9 @@ class TranscriptionController:
             if not isinstance(text_result, str):
                 # Эта ситуация не должна произойти, но это надежная защита
                 self._log_to_queue(
-                    f"Критическая ошибка: ожидался текст, получен {type(text_result)}"
+                    _("Критическая ошибка: ожидался текст, получен {}").format(
+                        type(text_result)
+                    )
                 )
                 return ""
             return text_result
@@ -313,21 +322,21 @@ class TranscriptionController:
         processed_path: Optional[str] = None
 
         if params["is_youtube"]:
-            self._log_to_queue("Загрузка с YouTube...")
+            self._log_to_queue(_("Загрузка с YouTube..."))
             youtube_adapter = YoutubeAdapter()
             adapters["youtube"] = youtube_adapter
             processed_path = youtube_adapter.download_audio(
                 url=audio_path, log_callback=self._log_to_queue
             )
         else:
-            self._log_to_queue("Обработка локального файла...")
+            self._log_to_queue(_("Обработка локального файла..."))
             local_file_adapter = LocalFileAdapter()
             adapters["local"] = local_file_adapter
             processed_path = local_file_adapter.process_file(
                 source_path=audio_path, log_callback=self._log_to_queue
             )
         if not processed_path:
-            raise IOError("Адаптер не вернул путь к обработанному файлу.")
+            raise IOError(_("Адаптер не вернул путь к обработанному файлу."))
         return processed_path
 
     def _execute_transcription(
@@ -354,12 +363,12 @@ class TranscriptionController:
             return {"text": "", "segments": []}
 
         self._log_to_queue(
-            f"Загрузка модели '{params['model_size'].value}' в память..."
+            _("Загрузка модели '{}' в память...").format(params["model_size"].value)
         )
         self.task_queue.put(QueueMessage(progress=0.3))
         model = whisper.load_model(model_path)
 
-        self._log_to_queue("Подготовка к транскрибации...")
+        self._log_to_queue(_("Подготовка к транскрибации..."))
         self.task_queue.put(QueueMessage(progress=0.35))
 
         def transcription_progress_callback(
@@ -370,7 +379,9 @@ class TranscriptionController:
                 self.task_queue.put(QueueMessage(progress=progress))
                 if processed_chunks % 5 == 0 or processed_chunks == total_chunks:
                     self._log_to_queue(
-                        f"Транскрибация... ({processed_chunks}/{total_chunks})"
+                        _("Транскрибация... ({}/{})").format(
+                            processed_chunks, total_chunks
+                        )
                     )
 
         service = TranscriptionService(model=model)
@@ -388,5 +399,7 @@ class TranscriptionController:
                 try:
                     adapter_instance.cleanup(log_callback=self._log_to_queue)
                 except Exception as e:
-                    msg = f"Не удалось очистить временные файлы {adapter_name}: {e}"
+                    msg = _("Не удалось очистить временные файлы {}: {}").format(
+                        adapter_name, e
+                    )
                     self._log_to_queue(msg)
